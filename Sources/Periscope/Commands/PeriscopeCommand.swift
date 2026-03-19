@@ -8,6 +8,7 @@ struct PeriscopeRoot: ParsableCommand {
         subcommands: [
             Navigate.self, Back.self, Forward.self,
             Reload.self, CurrentURL.self, History.self,
+            Extract.self, HTML.self, Attr.self, Links.self, Table.self,
         ]
     )
 }

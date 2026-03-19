@@ -128,4 +128,137 @@ final class BrowserEngine {
     func close() {
         windowController.close()
     }
+
+    // MARK: - Interaction
+
+    func click(selector: String, strict: Bool) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        _ = try await runJavaScript(ElementResolver.clickScript(selector: selector))
+    }
+
+    func fill(selector: String, value: String, strict: Bool) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        _ = try await runJavaScript(ElementResolver.fillScript(selector: selector, value: value))
+    }
+
+    func selectOption(selector: String, value: String, strict: Bool) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        _ = try await runJavaScript(ElementResolver.selectScript(selector: selector, value: value))
+    }
+
+    func setChecked(selector: String, checked: Bool, strict: Bool) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        _ = try await runJavaScript(ElementResolver.checkScript(selector: selector, checked: checked))
+    }
+
+    func submit(selector: String?) async throws {
+        if let selector { try await resolveElement(selector: selector, strict: false) }
+        _ = try await runJavaScript(ElementResolver.submitScript(selector: selector))
+    }
+
+    func scroll(target: String) async throws {
+        if !["up", "down", "top", "bottom"].contains(target) {
+            try await resolveElement(selector: target, strict: false)
+        }
+        _ = try await runJavaScript(ElementResolver.scrollScript(target: target))
+    }
+
+    func hover(selector: String, strict: Bool) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        _ = try await runJavaScript(ElementResolver.hoverScript(selector: selector))
+    }
+
+    // MARK: - Extraction
+
+    func extractText(selector: String?, raw: Bool) async throws -> String {
+        let js: String
+        if let selector {
+            js = """
+            (function() {
+                var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                return el ? el.innerHTML : null;
+            })();
+            """
+        } else {
+            js = """
+            (function() {
+                var el = document.querySelector('main')
+                      || document.querySelector('article')
+                      || document.body;
+                return el ? el.innerHTML : '';
+            })();
+            """
+        }
+        guard let html = try await runJavaScript(js) as? String else {
+            throw PeriscopeError.elementNotFound(selector: selector ?? "body")
+        }
+        return raw ? html : HTMLToMarkdown().convert(html)
+    }
+
+    func extractHTML(selector: String?) async throws -> String {
+        let js: String
+        if let selector {
+            js = """
+            (function() {
+                var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                return el ? el.outerHTML : null;
+            })();
+            """
+        } else {
+            js = "document.documentElement.outerHTML"
+        }
+        guard let html = try await runJavaScript(js) as? String else {
+            throw PeriscopeError.elementNotFound(selector: selector ?? "html")
+        }
+        return html
+    }
+
+    func extractAttribute(selector: String, attribute: String) async throws -> String {
+        let js = """
+        (function() {
+            var el = document.querySelector(\(ElementResolver.jsString(selector)));
+            return el ? el.getAttribute(\(ElementResolver.jsString(attribute))) : null;
+        })();
+        """
+        guard let value = try await runJavaScript(js) as? String else {
+            throw PeriscopeError.elementNotFound(selector: selector)
+        }
+        return value
+    }
+
+    func extractLinks() async throws -> [LinkItem] {
+        let js = """
+        Array.from(document.querySelectorAll('a[href]')).map(function(a) {
+            return { text: a.textContent.trim(), url: a.getAttribute('href') };
+        })
+        """
+        guard let results = try await runJavaScript(js) as? [[String: Any]] else {
+            return []
+        }
+        return results.map { LinkItem(text: $0["text"] as? String ?? "", url: $0["url"] as? String ?? "") }
+    }
+
+    func extractTable(selector: String) async throws -> String {
+        let js = """
+        (function() {
+            var table = document.querySelector(\(ElementResolver.jsString(selector)));
+            if (!table) return null;
+            return Array.from(table.querySelectorAll('tr')).map(function(row) {
+                return Array.from(row.querySelectorAll('td, th'))
+                    .map(function(cell) { return cell.textContent.trim(); });
+            });
+        })();
+        """
+        guard let rows = try await runJavaScript(js) as? [[String]] else {
+            throw PeriscopeError.elementNotFound(selector: selector)
+        }
+        guard !rows.isEmpty else { return "" }
+        var lines: [String] = []
+        lines.append("| " + rows[0].joined(separator: " | ") + " |")
+        lines.append("| " + rows[0].map { _ in "---" }.joined(separator: " | ") + " |")
+        for row in rows.dropFirst() {
+            lines.append("| " + row.joined(separator: " | ") + " |")
+        }
+        return lines.joined(separator: "\n")
+    }
 }
