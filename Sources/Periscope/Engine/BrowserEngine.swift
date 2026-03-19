@@ -129,6 +129,35 @@ final class BrowserEngine {
         windowController.close()
     }
 
+    // MARK: - Screenshot
+
+    func takeScreenshot(full: Bool) async throws -> Data {
+        if full {
+            let height = try await runJavaScript("Math.min(document.body.scrollHeight, 16384)") as? Int ?? 1080
+            let width = Int(windowController.window.frame.width)
+            windowController.resize(width: width, height: height)
+            try await Task.sleep(for: .milliseconds(200))
+            let data = try await captureWindow()
+            windowController.resize(width: width, height: 1080)
+            return data
+        }
+        return try await captureWindow()
+    }
+
+    private func captureWindow() async throws -> Data {
+        guard let view = windowController.window.contentView else {
+            throw PeriscopeError.screenshotFailed(reason: "No content view")
+        }
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            throw PeriscopeError.screenshotFailed(reason: "Failed to create bitmap")
+        }
+        view.cacheDisplay(in: view.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else {
+            throw PeriscopeError.screenshotFailed(reason: "Failed to encode PNG")
+        }
+        return png
+    }
+
     // MARK: - Interaction
 
     func click(selector: String, strict: Bool) async throws {
