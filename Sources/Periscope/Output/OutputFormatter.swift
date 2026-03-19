@@ -40,7 +40,7 @@ enum CommandResult: Sendable {
     case error(String)
 }
 
-protocol OutputFormatting {
+protocol OutputFormatting: Sendable {
     func format(_ result: CommandResult) -> String
 }
 
