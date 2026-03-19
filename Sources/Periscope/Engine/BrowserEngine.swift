@@ -125,6 +125,45 @@ final class BrowserEngine {
         }
     }
 
+    func showWindow() {
+        windowController.showWindow()
+    }
+
+    func hideWindow() {
+        windowController.hideWindow()
+    }
+
+    /// Wait for the URL to change away from `initialPath`, or for an explicit condition.
+    /// Used by the `login` command to detect when the user has logged in.
+    func waitForLoginCompletion(initialURL: URL, until: String?) async throws {
+        let initialPath = initialURL.path
+
+        while true {
+            if let until {
+                // Explicit condition
+                if until.hasPrefix("selector:") {
+                    let css = String(until.dropFirst("selector:".count))
+                    let exists = try await runJavaScript(ElementResolver.existsScript(selector: css)) as? Bool ?? false
+                    if exists { break }
+                } else if until.hasPrefix("url:") {
+                    let pattern = String(until.dropFirst("url:".count))
+                    if let currentURL = webView.url?.absoluteString, currentURL.contains(pattern) { break }
+                }
+            } else {
+                // Auto-detect: URL path changed away from login page
+                if let currentURL = webView.url {
+                    let currentPath = currentURL.path
+                    if currentPath != initialPath && !webView.isLoading {
+                        // Wait a bit for the page to settle
+                        try await Task.sleep(for: .milliseconds(1000))
+                        break
+                    }
+                }
+            }
+            try await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
     func close() {
         windowController.close()
     }

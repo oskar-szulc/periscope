@@ -35,6 +35,23 @@ final class HiddenWindowController {
         window.setContentSize(NSSize(width: width, height: height))
     }
 
+    func showWindow() {
+        window.styleMask = [.titled, .closable, .resizable]
+        window.alphaValue = 1.0
+        window.level = .floating
+        window.collectionBehavior = []
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func hideWindow() {
+        window.alphaValue = 0.01
+        window.level = .init(rawValue: -1000)
+        window.collectionBehavior = [.stationary, .canJoinAllSpaces, .ignoresCycle]
+        window.styleMask = [.borderless]
+    }
+
     func close() {
         window.close()
     }
