@@ -35,8 +35,9 @@ final class HiddenWindowController {
         window.setContentSize(NSSize(width: width, height: height))
     }
 
-    func showWindow() {
+    func showWindow(width: Int = 390, height: Int = 844) {
         window.styleMask = [.titled, .closable, .resizable]
+        window.setContentSize(NSSize(width: width, height: height))
         window.alphaValue = 1.0
         window.level = .floating
         window.collectionBehavior = []
