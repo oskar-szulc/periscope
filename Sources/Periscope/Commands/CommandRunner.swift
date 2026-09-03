@@ -57,12 +57,26 @@ enum CommandRunner {
         }
     }
 
+    /// Reopen a session's last page so cookies and localStorage can be injected into it.
+    ///
+    /// A saved URL goes stale routinely — a stopped dev server, an expired share link —
+    /// and it is only a convenience, never what the user asked for. Failing to reach it
+    /// must not block the command they actually ran, so a navigation failure here warns
+    /// and continues. Cookie and storage injection needs a loaded page, so it is skipped
+    /// in that case.
     @MainActor
     private static func restoreSession(engine: BrowserEngine, session: String) async throws {
         let manager = SessionManager()
         if let state = try manager.loadState(session: session),
            let url = URL(string: state.url) {
-            _ = try await engine.navigate(to: url)
+            do {
+                _ = try await engine.navigate(to: url)
+            } catch let error as PeriscopeError {
+                let warning = "warning: session '\(session)' could not reopen \(state.url) "
+                    + "(\(error.description)); continuing without restored cookies and storage\n"
+                FileHandle.standardError.write(Data(warning.utf8))
+                return
+            }
 
             let cookies = try manager.loadCookies(session: session)
             if !cookies.isEmpty {
