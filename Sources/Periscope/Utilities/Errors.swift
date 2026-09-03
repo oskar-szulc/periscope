@@ -30,7 +30,9 @@ enum PeriscopeError: Error, CustomStringConvertible {
         case .multipleElementsFound(let selector, let count):
             return "Selector '\(selector)' matched \(count) elements (--strict mode requires exactly 1)"
         case .navigationFailed(let url, let reason):
-            return "Navigation to \(url) failed: \(reason)"
+            return url.isEmpty
+                ? "Navigation failed: \(reason)"
+                : "Navigation to \(url) failed: \(reason)"
         case .timeout(let seconds):
             return "Operation timed out after \(seconds)s"
         case .sessionError(let reason):

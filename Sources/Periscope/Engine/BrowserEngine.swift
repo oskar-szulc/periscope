@@ -20,7 +20,7 @@ final class BrowserEngine {
     /// Awaits the `.finished` event instead of polling `isLoading`.
     func navigate(to url: URL) async throws -> (title: String?, url: String) {
         let events = page.load(URLRequest(url: url))
-        try await awaitNavigation(events)
+        try await awaitNavigation(events, target: url.absoluteString)
         let title = await resolveTitle()
         return (title, page.url?.absoluteString ?? url.absoluteString)
     }
@@ -28,10 +28,11 @@ final class BrowserEngine {
     func goBack() async throws -> (title: String?, url: String) {
         let list = page.backForwardList
         guard let backItem = list.backList.last else {
-            throw PeriscopeError.navigationFailed(url: "", reason: "No back history")
+            throw PeriscopeError.navigationFailed(
+                url: page.url?.absoluteString ?? "", reason: "No back history")
         }
         let events = page.load(backItem)
-        try await awaitNavigation(events)
+        try await awaitNavigation(events, target: backItem.url.absoluteString)
         let title = await resolveTitle()
         return (title, page.url?.absoluteString ?? "")
     }
@@ -39,17 +40,18 @@ final class BrowserEngine {
     func goForward() async throws -> (title: String?, url: String) {
         let list = page.backForwardList
         guard let forwardItem = list.forwardList.first else {
-            throw PeriscopeError.navigationFailed(url: "", reason: "No forward history")
+            throw PeriscopeError.navigationFailed(
+                url: page.url?.absoluteString ?? "", reason: "No forward history")
         }
         let events = page.load(forwardItem)
-        try await awaitNavigation(events)
+        try await awaitNavigation(events, target: forwardItem.url.absoluteString)
         let title = await resolveTitle()
         return (title, page.url?.absoluteString ?? "")
     }
 
     func reload() async throws -> (title: String?, url: String) {
         let events = page.reload()
-        try await awaitNavigation(events)
+        try await awaitNavigation(events, target: page.url?.absoluteString ?? "")
         let title = await resolveTitle()
         return (title, page.url?.absoluteString ?? "")
     }
@@ -72,7 +74,14 @@ final class BrowserEngine {
     /// Await a navigation's AsyncSequence until `.finished`, logging events if verbose.
     /// If the sequence throws (e.g. a redirect cancels the provisional navigation),
     /// fall back to polling until the replacement navigation completes.
-    private func awaitNavigation(_ events: some AsyncSequence<WebPage.NavigationEvent, any Error>) async throws {
+    ///
+    /// - Parameter target: the URL being navigated to. A failed *provisional* navigation
+    ///   never commits, so `page.url` is still nil at that point — without this the error
+    ///   would report an empty URL.
+    private func awaitNavigation(
+        _ events: some AsyncSequence<WebPage.NavigationEvent, any Error>,
+        target: String
+    ) async throws {
         do {
             for try await event in events {
                 if verbose {
@@ -84,16 +93,17 @@ final class BrowserEngine {
             switch navError {
             case .failedProvisionalNavigation(let underlying):
                 throw PeriscopeError.navigationFailed(
-                    url: page.url?.absoluteString ?? "",
-                    reason: underlying.localizedDescription)
+                    url: failedURL(underlying) ?? target,
+                    reason: Self.describe(underlying))
             case .pageClosed:
-                throw PeriscopeError.navigationFailed(url: "", reason: "Page was closed")
+                throw PeriscopeError.navigationFailed(url: target, reason: "Page was closed")
             case .webContentProcessTerminated:
-                throw PeriscopeError.navigationFailed(url: "", reason: "Web content process terminated")
+                throw PeriscopeError.navigationFailed(
+                    url: target, reason: "Web content process terminated")
             case .invalidURL:
-                throw PeriscopeError.navigationFailed(url: "", reason: "Invalid URL")
+                throw PeriscopeError.navigationFailed(url: target, reason: "Invalid URL")
             @unknown default:
-                throw PeriscopeError.navigationFailed(url: "", reason: "\(navError)")
+                throw PeriscopeError.navigationFailed(url: target, reason: "\(navError)")
             }
         } catch {
             // Non-navigation error (e.g. cancellation). Fall back to polling.
@@ -103,6 +113,28 @@ final class BrowserEngine {
             while page.isLoading {
                 try await Task.sleep(for: .milliseconds(50))
             }
+        }
+    }
+
+    /// The URL URLSession reports as failing, which differs from the requested URL
+    /// when the failure happened after a redirect.
+    private func failedURL(_ error: any Error) -> String? {
+        let ns = error as NSError
+        return (ns.userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.absoluteString
+    }
+
+    /// Append the underlying error domain/code to Apple's terse message, so
+    /// "Could not connect to the server." becomes diagnosable.
+    static func describe(_ error: any Error) -> String {
+        let ns = error as NSError
+        let message = ns.localizedDescription
+        switch ns.domain {
+        case NSURLErrorDomain:
+            return "\(message) (NSURLError \(ns.code))"
+        case let domain where domain == kCFErrorDomainCFNetwork as String:
+            return "\(message) (CFNetwork \(ns.code))"
+        default:
+            return "\(message) (\(ns.domain) \(ns.code))"
         }
     }
 
