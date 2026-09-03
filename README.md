@@ -82,6 +82,7 @@ reload                Reload page
 url                   Print current URL
 history               Print history
 
+state                 URL, content and every actionable selector
 text [selector]       Content as markdown
 html [selector]       Raw HTML
 attr <sel> <attr>     Get attribute value

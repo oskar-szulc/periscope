@@ -36,6 +36,7 @@ enum CommandResult: Sendable, Codable {
     case cookies([CookieItem])
     case sessionList([String])
     case history(items: [HistoryItem])
+    case state(PageStateData)
     case plain(String)
     case error(String)
 }

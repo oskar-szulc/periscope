@@ -8,13 +8,14 @@ Binary: `/opt/homebrew/bin/periscope`
 
 ```bash
 periscope navigate "https://example.com" --session work
-periscope text --session work
+periscope state --session work
 ```
 
-Two rules cover most mistakes:
+Three rules cover most mistakes:
 
 1. **Always pass `--session <name>`.** Commands share a browser only when they share a session name.
 2. **`navigate` first.** Every other command reads or acts on whatever page the session is already on.
+3. **`state` to orient.** One call gives you the URL, the content, and every element you can act on with a ready-to-use selector — instead of `url` + `text` + `elements`.
 
 ## Sessions
 
@@ -54,6 +55,46 @@ periscope url                            # Print current URL
 periscope history                        # Print back/forward list
 ```
 
+### Orienting: `state`
+
+```bash
+periscope state                          # URL, title, headings, content, and every action
+periscope state --actions-only           # Skip the content, just what is clickable
+periscope state --text-limit 500         # Cap the content
+```
+
+This is the command to reach for after `navigate`, and after any click that changes
+the page. It answers "where am I and what can I do here" in one round trip:
+
+```
+URL: file:///…/form.html
+Title: Form Test Page
+
+Content:
+User Admin Sign In
+
+Actions (5):
+  #username    input[text]
+  #password    input[password]
+  #role        select  "User Admin"
+  #remember    input[checkbox]  unchecked
+  #submit-btn  button  "Sign In"
+```
+
+Every selector in the `Actions` list is verified to match **exactly one** element,
+so you can use it verbatim:
+
+```bash
+periscope fill "#username" "bob" --session work
+periscope click "#submit-btn" --session work
+```
+
+Elements that are hidden or invisible are left out — you cannot act on them — and
+disabled ones are marked `DISABLED`. Pages without ids get structural selectors
+(`ul > li:nth-of-type(2) > a`), which are still unique and still usable.
+
+`--json` gives the same data structured, under a `state` key.
+
 ### Reading the page
 
 ```bash
@@ -68,9 +109,12 @@ periscope table "<selector>"             # A table as markdown
 periscope elements "<selector>"          # Matching elements with tag, id, classes, text
 ```
 
-`text` is the one to reach for by default — it is the most token-efficient view of a page. `extract` is a deprecated alias for it.
+Reach for these when you want one specific thing; use `state` when you want to
+orient. `text` is the most token-efficient view of a page's prose. `extract` is a
+deprecated alias for `text`.
 
-Use `elements` when a selector is not matching what you expected; it shows what is actually there.
+Use `elements` when a selector is not matching what you expected; it shows what is
+actually there, including hidden nodes that `state` omits.
 
 ### Interaction
 
@@ -223,13 +267,14 @@ periscope navigate "https://example.com" --session s1
 periscope text --session s1
 ```
 
-**Fill and submit a form**
+**Fill and submit a form, without guessing selectors**
 
 ```bash
 periscope navigate "https://example.com/search" --session s1
+periscope state --actions-only --session s1     # read the real selectors
 periscope fill "#query" "search terms" --session s1
 periscope click "#submit" --wait fetchquiet --session s1
-periscope text ".results" --session s1
+periscope state --session s1                    # see what the click produced
 ```
 
 **Walk several pages**
@@ -259,7 +304,8 @@ periscope eval "JSON.stringify([...document.querySelectorAll('h2')].map(h => h.t
 **Debug a selector that is not matching**
 
 ```bash
-periscope elements "button" --session s1
+periscope state --actions-only --session s1    # the selectors that do work
+periscope elements "button" --session s1       # everything, hidden included
 periscope html ".container" --session s1
 ```
 

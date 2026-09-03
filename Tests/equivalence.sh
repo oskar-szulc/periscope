@@ -54,6 +54,8 @@ run_both "bad selector"      attr "#nonexistent-xyz" href
 run_both "bad url"           navigate "https://nope-xyz.invalid/p"
 run_both "invalid url arg"   navigate "::::"
 run_both "cookie list"       cookie list
+run_both "state"             state
+run_both "state actions"     state --actions-only
 run_both "json ok"           --json url
 run_both "json error"        --json navigate "https://nope-xyz.invalid/p"
 
@@ -77,7 +79,31 @@ check_relative_paths() {
     rm -rf "$a" "$b"
 }
 
+# Every selector `state` emits must resolve to exactly one element -- a selector
+# matching twelve buttons is worse than none, because the agent will act on the
+# wrong one.
+check_state_selectors() {
+    "$BIN" navigate "file://$FIXTURES/form.html" --session "$sess_daemon" >/dev/null 2>&1
+    local bad=0 total=0
+    while read -r sel; do
+        [[ -z "$sel" ]] && continue
+        total=$((total+1))
+        local n
+        n=$("$BIN" eval "document.querySelectorAll(${sel}).length" \
+            --session "$sess_daemon" 2>/dev/null)
+        [[ "$n" == "1" ]] || { bad=$((bad+1)); printf '       %s matched %s\n' "$sel" "$n"; }
+    done < <("$BIN" state --session "$sess_daemon" --json 2>/dev/null \
+             | python3 -c 'import json,sys;[print(json.dumps(e["selector"])) for e in json.load(sys.stdin)["state"]["elements"]]')
+
+    if [[ $total -gt 0 && $bad -eq 0 ]]; then
+        PASS=$((PASS+1)); printf '  ok   all %s state selectors resolve uniquely\n' "$total"
+    else
+        FAIL=$((FAIL+1)); printf '  FAIL %s of %s state selectors ambiguous\n' "$bad" "$total"
+    fi
+}
+
 echo
+check_state_selectors
 check_relative_paths
 
 echo

@@ -32,6 +32,15 @@ struct JSONFormatter: OutputFormatting {
                 ["title": $0.title as Any, "url": $0.url,
                  "current": $0.isCurrent] as [String: Any]
             }]
+        case .state(let state):
+            // Encoded through the Codable type rather than rebuilt as a
+            // dictionary, so the JSON cannot drift from the struct.
+            if let data = try? JSONEncoder().encode(state),
+               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                dict = ["ok": true, "state": object]
+            } else {
+                dict = ["ok": false, "error": "Failed to encode page state"]
+            }
         case .plain(let text):
             dict = ["ok": true, "text": text]
         case .error(let message):
