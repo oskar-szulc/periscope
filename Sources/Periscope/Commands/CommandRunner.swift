@@ -42,7 +42,7 @@ enum CommandRunner {
         }
 
         if let error = response.error {
-            emit(error.message, formatter: formatter, globals: globals)
+            emit(error, formatter: formatter, globals: globals)
             Foundation.exit(error.exitCode)
         }
         if let result = response.result {
@@ -83,11 +83,13 @@ enum CommandRunner {
                     print(formatter.format(result))
                     await MainActor.run { engine.close() }
                 } catch let error as PeriscopeError {
-                    emit(error.description, formatter: formatter, globals: globals)
+                    emit(ErrorPayload(error), formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(error.exitCode)
                 } catch {
-                    emit(error.localizedDescription, formatter: formatter, globals: globals)
+                    emit(ErrorPayload(code: "INTERNAL",
+                                      message: error.localizedDescription, exitCode: 1),
+                         formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(1)
                 }
@@ -95,8 +97,8 @@ enum CommandRunner {
         }
     }
 
-    private static func emit(_ message: String, formatter: OutputFormatting, globals: GlobalOptions) {
-        let output = formatter.format(.error(message))
+    private static func emit(_ payload: ErrorPayload, formatter: OutputFormatting, globals: GlobalOptions) {
+        let output = formatter.formatError(payload)
         if globals.json {
             print(output)
         } else {

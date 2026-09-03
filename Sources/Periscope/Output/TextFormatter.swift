@@ -38,4 +38,8 @@ struct TextFormatter: OutputFormatting {
             return "Error: \(message)"
         }
     }
+
+    func formatError(_ payload: ErrorPayload) -> String {
+        "Error: " + payload.message
+    }
 }

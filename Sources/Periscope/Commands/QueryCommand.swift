@@ -14,6 +14,25 @@ struct FoundElement {
     var confidence: String
 }
 
+/// `query` answers a question about the page; `find` resolves a description to a
+/// selector. They were one command with a `--find` flag, which made the return
+/// type depend on a flag -- prose one way, a selector the other.
+struct Find: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Find an interactive element by description, returning a CSS selector")
+
+    @OptionGroup var globals: GlobalOptions
+
+    @Argument(help: "Description of the element, e.g. \"the sign in button\"")
+    var description: String
+
+    func run() throws {
+        var query = Query(globals: globals, question: description)
+        query.find = true
+        try query.run()
+    }
+}
+
 struct Query: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Ask a natural language question about the current page")
@@ -23,8 +42,15 @@ struct Query: ParsableCommand {
     @Argument(help: "Question about the page")
     var question: String
 
-    @Flag(name: .long, help: "Find an interactive element (returns selector)")
+    @Flag(name: .long, help: "Return a CSS selector instead of prose (see `find`)")
     var find: Bool = false
+
+    init() {}
+
+    init(globals: GlobalOptions, question: String) {
+        self.globals = globals
+        self.question = question
+    }
 
     func run() throws {
         let isJson = globals.json

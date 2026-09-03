@@ -29,9 +29,9 @@ Or wherever you keep local binaries that's in your PATH.
 ## Quick Start
 
 ```bash
-# Navigate and extract content
+# Navigate and read content
 periscope navigate "https://example.com" --session demo
-periscope extract --session demo
+periscope text --session demo
 
 # Take a screenshot
 periscope screenshot /tmp/page.png --session demo
@@ -49,9 +49,19 @@ periscope login "https://app.example.com/login" --session myapp
 
 ## How It Works
 
-Each invocation starts a hidden `NSApplication` with a near-invisible window containing a SwiftUI `WebView` backed by a `WebPage`. The window is on-screen but at near-zero alpha to keep WebKit's rendering pipeline active.
+A background daemon holds a live `WebPage` per named session. The CLI is a thin
+client that sends one command over a unix socket at `~/.periscope/run/sock` and
+prints the reply, so commands after the first in a session reuse a browser that
+is genuinely still open — no page reload, and JS state, SPA route and scroll
+position all survive. The daemon starts on demand; you never launch it yourself.
 
-Sessions persist cookies, localStorage, and the last URL to `~/.periscope/sessions/<name>/` so state carries across invocations.
+Sessions are also flushed to `~/.periscope/sessions/<name>/` (cookies,
+localStorage, last URL) when evicted or on shutdown, so they survive a reboot
+and cold-start from there.
+
+`--no-daemon` runs everything in-process instead: correct, but it rebuilds the
+page from that snapshot on every command. It is the automatic fallback whenever
+the daemon cannot be reached, so periscope never hard-fails on daemon trouble.
 
 ## Agent Integration
 
@@ -72,7 +82,7 @@ reload                Reload page
 url                   Print current URL
 history               Print history
 
-extract [selector]    Content as markdown
+text [selector]       Content as markdown
 html [selector]       Raw HTML
 attr <sel> <attr>     Get attribute value
 links                 List all links
@@ -90,11 +100,16 @@ screenshot [path]     Take screenshot
 eval <code>           Execute JavaScript
 
 session list/delete/export/import
-cookie set/delete
-cookies               List cookies
+cookie list/set/delete
 login <url>           Manual login with visible browser
 wait <strategy>       Wait for condition
 elements <selector>   Inspect matching elements
+
+query <question>      Ask about the page (Apple Intelligence)
+find <description>    Description -> CSS selector
+
+daemon status/stop    Inspect or stop the session daemon
+serve                 Run the daemon in the foreground
 ```
 
 ## License

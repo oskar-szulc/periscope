@@ -44,4 +44,21 @@ struct JSONFormatter: OutputFormatting {
         }
         return string
     }
+
+    func formatError(_ payload: ErrorPayload) -> String {
+        var error: [String: Any] = [
+            "code": payload.code,
+            "message": payload.message,
+        ]
+        if let url = payload.url { error["url"] = url }
+        if let underlying = payload.underlying { error["underlying"] = underlying }
+
+        let dict: [String: Any] = ["ok": false, "error": error]
+        guard let data = try? JSONSerialization.data(
+                withJSONObject: dict, options: [.sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return "{\"ok\":false,\"error\":{\"code\":\"INTERNAL\"}}"
+        }
+        return string
+    }
 }

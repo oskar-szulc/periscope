@@ -40,8 +40,8 @@ run_both() {
 
 echo "equivalence: in-process vs daemon"
 run_both "navigate"          navigate "file://$FIXTURES/table.html"
-run_both "navigate + extract" navigate "file://$FIXTURES/article.html"
-run_both "extract"           extract
+run_both "navigate 2"        navigate "file://$FIXTURES/article.html"
+run_both "text"              text
 run_both "html"              html
 run_both "links"             links
 run_both "table"             table
@@ -52,6 +52,9 @@ run_both "eval string"       eval "document.title"
 run_both "bad selector"      attr "#nonexistent-xyz" href
 run_both "bad url"           navigate "https://nope-xyz.invalid/p"
 run_both "invalid url arg"   navigate "::::"
+run_both "cookie list"       cookie list
+run_both "json ok"           --json url
+run_both "json error"        --json navigate "https://nope-xyz.invalid/p"
 
 echo
 echo "passed: $PASS  failed: $FAIL"

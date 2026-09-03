@@ -42,6 +42,9 @@ enum CommandResult: Sendable, Codable {
 
 protocol OutputFormatting: Sendable {
     func format(_ result: CommandResult) -> String
+    /// Failures carry a stable machine-readable code, so a caller can branch on
+    /// what went wrong instead of pattern-matching an English sentence.
+    func formatError(_ payload: ErrorPayload) -> String
 }
 
 func makeFormatter(json: Bool) -> OutputFormatting {
