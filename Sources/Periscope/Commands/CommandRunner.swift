@@ -15,10 +15,21 @@ enum CommandRunner {
         set { Thread.current.threadDictionary["periscope.daemonExecution"] = newValue }
     }
 
+    /// Resolve a user-supplied path against the directory the *client* ran in.
+    ///
+    /// A command's own `FileManager` sees the daemon's working directory, which is
+    /// wherever it happened to be spawned -- so `screenshot shot.png` would write
+    /// to some unrelated directory and report success. Any command that touches
+    /// the filesystem must route its path through here.
+    static func resolvePath(_ path: String) -> String {
+        guard let base = daemonExecution?.workingDirectory else { return path }
+        return URL(fileURLWithPath: path, relativeTo: URL(fileURLWithPath: base)).path
+    }
+
     static func run(globals: GlobalOptions, command: @escaping CommandBlock) {
         // Inside the daemon: hand the block over instead of running it.
         if let execution = daemonExecution {
-            execution.capture(command)
+            execution.block = command
             return
         }
 
@@ -110,9 +121,11 @@ enum CommandRunner {
 /// Carries a command block out of a subcommand's synchronous `run()` so the
 /// daemon can execute it against a live session instead of a fresh engine.
 final class DaemonExecution: @unchecked Sendable {
-    private(set) var block: CommandRunner.CommandBlock?
+    var block: CommandRunner.CommandBlock?
+    /// The client's working directory, for `CommandRunner.resolvePath`.
+    let workingDirectory: String?
 
-    func capture(_ block: @escaping CommandRunner.CommandBlock) {
-        self.block = block
+    init(workingDirectory: String?) {
+        self.workingDirectory = workingDirectory
     }
 }

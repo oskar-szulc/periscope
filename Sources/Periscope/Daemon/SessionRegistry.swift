@@ -4,84 +4,114 @@ import Foundation
 ///
 /// Bounded on two axes because each `LiveSession` owns a WebKit content process:
 /// idle sessions age out, and the total is capped with LRU eviction. Eviction is
-/// not data loss — the session is flushed to disk and cold-starts on next use.
+/// not data loss -- the session is flushed to disk and cold-starts on next use.
 actor SessionRegistry {
     struct Info: Sendable {
         let name: String
         let lastUsed: Date
     }
 
-    private var sessions: [String: LiveSession] = [:]
+    private struct Entry {
+        let session: LiveSession
+        /// Held here rather than read back off the session actor: an eviction scan
+        /// that awaits each session suspends mid-scan, and can then observe the
+        /// dictionary it is walking mutated underneath it.
+        var lastUsed: Date
+        let isEphemeral: Bool
+    }
+
+    private var entries: [String: Entry] = [:]
     private let capacity: Int
     private let idleTimeout: TimeInterval
-    private let viewport: (width: Int, height: Int)
+    private var ephemeralCounter = 0
 
-    init(capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60,
-         viewport: (width: Int, height: Int) = (1920, 1080)) {
+    init(capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60) {
         self.capacity = capacity
         self.idleTimeout = idleTimeout
-        self.viewport = viewport
     }
 
     /// Warm path: hand back the live session. Cold path: build one and replay the
     /// snapshot into it, once.
     func session(named name: String, viewport: (width: Int, height: Int)) async -> LiveSession {
-        if let existing = sessions[name] { return existing }
+        if let existing = entries[name] {
+            entries[name]?.lastUsed = Date()
+            return existing.session
+        }
 
-        await evictIfNeeded(making: 1)
+        await evictOldestIfFull()
         let session = await LiveSession(
             name: name, viewportWidth: viewport.width, viewportHeight: viewport.height)
-        sessions[name] = session
+        entries[name] = Entry(session: session, lastUsed: Date(), isEphemeral: false)
         await session.restoreFromDisk()
         return session
     }
 
-    /// `--no-session`: an engine with no disk identity, torn down after the command.
+    /// `--no-session`: a browser with no disk identity, discarded after the command.
+    ///
+    /// Registered like any other session rather than handed out untracked. The
+    /// registry is what bounds WebKit content processes, so an unregistered
+    /// session would be invisible to the capacity cap and to shutdown -- N
+    /// concurrent `--no-session` commands would be N unbounded processes, and the
+    /// daemon could decide it was idle and exit while they were still running.
     func ephemeralSession(viewport: (width: Int, height: Int)) async -> LiveSession {
-        await LiveSession(
-            name: "(ephemeral)", viewportWidth: viewport.width,
+        await evictOldestIfFull()
+        ephemeralCounter += 1
+        let key = "(ephemeral \(ephemeralCounter))"
+        let session = await LiveSession(
+            name: key, viewportWidth: viewport.width,
             viewportHeight: viewport.height, ephemeral: true)
+        entries[key] = Entry(session: session, lastUsed: Date(), isEphemeral: true)
+        return session
+    }
+
+    /// Drop an ephemeral session once its command is done. Named sessions ignore
+    /// this -- they live until evicted.
+    func release(_ session: LiveSession) async {
+        let name = await session.name
+        guard let entry = entries[name], entry.isEphemeral else { return }
+        entries[name] = nil
+        await entry.session.shutdown()
+    }
+
+    func touch(_ name: String) {
+        entries[name]?.lastUsed = Date()
     }
 
     func evictIdle() async {
         let cutoff = Date().addingTimeInterval(-idleTimeout)
-        for (name, session) in sessions where await session.lastUsed < cutoff {
-            await session.shutdown()
-            sessions[name] = nil
+        // An ephemeral session belongs to an in-flight command, never to the clock.
+        for (name, entry) in entries where !entry.isEphemeral && entry.lastUsed < cutoff {
+            entries[name] = nil
+            await entry.session.shutdown()
         }
     }
 
-    private func evictIfNeeded(making room: Int) async {
-        while sessions.count + room > capacity {
-            var oldestName: String?
-            var oldestDate = Date.distantFuture
-            for (name, session) in sessions {
-                let used = await session.lastUsed
-                if used < oldestDate {
-                    oldestDate = used
-                    oldestName = name
-                }
-            }
-            guard let victim = oldestName, let session = sessions[victim] else { return }
-            await session.shutdown()
-            sessions[victim] = nil
-        }
+    /// At most one session can be over the line, since the cap is an invariant
+    /// every insertion path maintains.
+    private func evictOldestIfFull() async {
+        guard entries.count >= capacity else { return }
+        guard let victim = entries
+            .filter({ !$0.value.isEphemeral })
+            .min(by: { $0.value.lastUsed < $1.value.lastUsed })
+        else { return }
+
+        entries[victim.key] = nil
+        await victim.value.session.shutdown()
     }
 
-    var isEmpty: Bool { sessions.isEmpty }
+    var isEmpty: Bool { entries.isEmpty }
 
-    func info() async -> [Info] {
-        var out: [Info] = []
-        for (name, session) in sessions {
-            out.append(Info(name: name, lastUsed: await session.lastUsed))
-        }
-        return out.sorted { $0.lastUsed > $1.lastUsed }
+    func info() -> [Info] {
+        entries
+            .map { Info(name: $0.key, lastUsed: $0.value.lastUsed) }
+            .sorted { $0.lastUsed > $1.lastUsed }
     }
 
     func shutdownAll() async {
-        for (_, session) in sessions {
+        let live = entries.values.map(\.session)
+        entries.removeAll()
+        for session in live {
             await session.shutdown()
         }
-        sessions.removeAll()
     }
 }

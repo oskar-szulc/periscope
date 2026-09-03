@@ -31,9 +31,12 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "Run in-process instead of via the session daemon")
     var noDaemon: Bool = false
 
-    var viewportSize: (width: Int, height: Int) {
-        let parts = viewport.split(separator: "x").compactMap { Int($0) }
-        guard parts.count == 2 else { return (1920, 1080) }
-        return (parts[0], parts[1])
-    }
+    var viewportSize: (width: Int, height: Int) { parseViewport(viewport) }
+}
+
+/// Shared by `GlobalOptions` and its wire payload so the default cannot drift.
+func parseViewport(_ value: String) -> (width: Int, height: Int) {
+    let parts = value.split(separator: "x").compactMap { Int($0) }
+    guard parts.count == 2 else { return (1920, 1080) }
+    return (parts[0], parts[1])
 }

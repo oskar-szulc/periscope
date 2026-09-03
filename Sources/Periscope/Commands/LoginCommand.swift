@@ -78,19 +78,7 @@ struct Login: ParsableCommand {
 
         // Restore existing session if any (to pre-fill cookies)
         if !noSession {
-            let manager = SessionManager()
-            if let state = try manager.loadState(session: sessionName),
-               let existingURL = URL(string: state.url) {
-                _ = try? await engine.navigate(to: existingURL)
-                let cookies = try manager.loadCookies(session: sessionName)
-                if !cookies.isEmpty {
-                    let js = cookies.map { c in
-                        "document.cookie = '\(c.name)=\(c.value); path=\(c.path); domain=\(c.domain)"
-                        + (c.secure ? "; secure" : "") + "';"
-                    }.joined(separator: "\n")
-                    try? await engine.runJavaScriptVoid(js)
-                }
-            }
+            _ = try? await SessionRestore.restore(engine: engine, session: sessionName)
         }
 
         // Navigate to the login URL
@@ -116,41 +104,9 @@ struct Login: ParsableCommand {
 
         // Save session
         if !noSession {
-            let manager = SessionManager()
-            let sessionURL = engine.currentURL ?? urlString
-            let sessionTitle = engine.currentTitle
-
-            try manager.saveState(
-                SessionState(url: sessionURL, title: sessionTitle, viewport: viewportStr),
-                session: sessionName)
-
-            if let cookieStr = try await engine.runJavaScript("document.cookie") as? String,
-               !cookieStr.isEmpty {
-                let host = URL(string: sessionURL)?.host ?? ""
-                let cookies = cookieStr.split(separator: ";").map { pair in
-                    let parts = pair.trimmingCharacters(in: .whitespaces)
-                        .split(separator: "=", maxSplits: 1)
-                    return PersistedCookie(
-                        name: String(parts[0]),
-                        value: parts.count > 1 ? String(parts[1]) : "",
-                        domain: host, path: "/", expires: nil,
-                        secure: false, httpOnly: false)
-                }
-                try manager.saveCookies(cookies, session: sessionName)
-            }
-
-            if let json = try await engine.runJavaScript(
-                StorageManager.extractionScript()) as? String,
-               let data = json.data(using: .utf8),
-               let dict = try? JSONSerialization.jsonObject(with: data)
-                   as? [String: String] {
-                let origin = URL(string: sessionURL).map {
-                    "\($0.scheme ?? "https")://\($0.host ?? "")"
-                } ?? sessionURL
-                try manager.saveStorage(
-                    PersistedStorage(origin: origin, localStorage: dict),
-                    session: sessionName)
-            }
+            try await SessionRestore.save(
+                engine: engine, session: sessionName,
+                viewport: viewportStr, fallbackURL: urlString)
         }
 
         print(formatter.format(

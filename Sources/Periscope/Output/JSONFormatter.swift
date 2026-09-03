@@ -51,7 +51,6 @@ struct JSONFormatter: OutputFormatting {
             "message": payload.message,
         ]
         if let url = payload.url { error["url"] = url }
-        if let underlying = payload.underlying { error["underlying"] = underlying }
 
         let dict: [String: Any] = ["ok": false, "error": error]
         guard let data = try? JSONSerialization.data(

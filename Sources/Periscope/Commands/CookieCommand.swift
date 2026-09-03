@@ -48,10 +48,9 @@ struct CookieListCmd: ParsableCommand {
         CommandRunner.run(globals: globals) { engine in
             let str = try await engine.runJavaScript("document.cookie") as? String ?? ""
             guard !str.isEmpty else { return .cookies([]) }
-            let items = str.split(separator: ";").map { pair in
-                let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
-                let host = engine.currentURL.flatMap { URL(string: $0)?.host } ?? ""
-                return CookieItem(name: String(parts[0]), value: parts.count > 1 ? String(parts[1]) : "", domain: host)
+            let host = engine.currentURL.flatMap { URL(string: $0)?.host } ?? ""
+            let items = parseDocumentCookie(str).map {
+                CookieItem(name: $0.name, value: $0.value, domain: host)
             }
             return .cookies(items)
         }

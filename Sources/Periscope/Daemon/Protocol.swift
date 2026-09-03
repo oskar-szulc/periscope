@@ -49,32 +49,9 @@ struct GlobalOptionsPayload: Codable, Sendable {
         strict = g.strict
     }
 
-    /// ArgumentParser types cannot be constructed directly -- their property
-    /// wrappers are only populated by parsing -- so control requests, which carry
-    /// no user options, build the payload themselves.
-    static let controlDefault = GlobalOptionsPayload(
-        session: "default", noSession: true, json: false, timeout: 30,
-        viewport: "1920x1080", userAgent: nil, wait: nil, verbose: false, strict: false)
-
-    private init(session: String, noSession: Bool, json: Bool, timeout: Int,
-                 viewport: String, userAgent: String?, wait: String?,
-                 verbose: Bool, strict: Bool) {
-        self.session = session
-        self.noSession = noSession
-        self.json = json
-        self.timeout = timeout
-        self.viewport = viewport
-        self.userAgent = userAgent
-        self.wait = wait
-        self.verbose = verbose
-        self.strict = strict
-    }
-
-    var viewportSize: (width: Int, height: Int) {
-        let parts = viewport.split(separator: "x").compactMap { Int($0) }
-        guard parts.count == 2 else { return (1920, 1080) }
-        return (parts[0], parts[1])
-    }
+    /// Shares the parser's implementation so the two cannot drift on the
+    /// fallback or the accepted spelling.
+    var viewportSize: (width: Int, height: Int) { parseViewport(viewport) }
 }
 
 enum ControlVerb: String, Codable, Sendable {
@@ -102,7 +79,12 @@ struct Request: Codable, Sendable {
     /// The daemon re-parses it with ArgumentParser so the client and daemon
     /// cannot drift on how a command is interpreted.
     var arguments: [String]
-    var options: GlobalOptionsPayload
+    /// The client's working directory. Without it, a relative path in a command
+    /// (`screenshot shot.png`) resolves against the daemon's cwd -- silently
+    /// writing to the wrong directory while reporting success.
+    var workingDirectory: String?
+    /// Absent for control requests, which are not commands and have no options.
+    var options: GlobalOptionsPayload?
 }
 
 struct ErrorPayload: Codable, Sendable {
@@ -110,14 +92,12 @@ struct ErrorPayload: Codable, Sendable {
     var message: String
     var exitCode: Int32
     var url: String?
-    var underlying: Int?
 
-    init(code: String, message: String, exitCode: Int32, url: String? = nil, underlying: Int? = nil) {
+    init(code: String, message: String, exitCode: Int32, url: String? = nil) {
         self.code = code
         self.message = message
         self.exitCode = exitCode
         self.url = url
-        self.underlying = underlying
     }
 
     init(_ error: PeriscopeError) {

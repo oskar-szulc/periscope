@@ -209,7 +209,7 @@ The message names the URL that failed and the underlying error code, so a failur
 JSON mode puts a stable machine-readable code on stdout — branch on `code`, never on the message text:
 
 ```json
-{"ok": false, "error": {"code": "NAVIGATION_FAILED", "message": "...", "url": "https://nope.invalid/p", "underlying": -1003}}
+{"ok": false, "error": {"code": "NAVIGATION_FAILED", "message": "...", "url": "https://nope.invalid/p"}}
 ```
 
 Codes: `NAVIGATION_FAILED`, `ELEMENT_NOT_FOUND`, `MULTIPLE_ELEMENTS_FOUND`, `TIMEOUT`, `SESSION_ERROR`, `JAVASCRIPT_ERROR`, `ARGUMENT_ERROR`, `SCREENSHOT_FAILED`.

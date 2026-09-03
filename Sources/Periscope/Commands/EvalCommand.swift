@@ -14,13 +14,15 @@ struct Eval: ParsableCommand {
     }
 
     func run() throws {
+        // Read here, not inside the block: the block runs later on the MainActor,
+        // after the daemon's interception context -- which knows the client's
+        // directory -- has been torn down.
+        let script = try file.map {
+            try String(contentsOf: URL(fileURLWithPath: CommandRunner.resolvePath($0)),
+                       encoding: .utf8)
+        } ?? code!
+
         CommandRunner.run(globals: globals) { engine in
-            let script: String
-            if let file {
-                script = try String(contentsOf: URL(fileURLWithPath: file), encoding: .utf8)
-            } else {
-                script = code!
-            }
             // callJavaScript treats the script as a function body, so user
             // scripts that are simple expressions work with auto-prepended return.
             // For multi-statement scripts, wrap in eval() so the last expression

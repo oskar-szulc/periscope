@@ -8,12 +8,16 @@ import Foundation
 actor LiveSession {
     let name: String
     private let engine: BrowserEngine
-    private let lock = AsyncLock()
-    private(set) var lastUsed = Date()
-    private(set) var isEphemeral: Bool
+    private let isEphemeral: Bool
 
     /// Warnings raised while restoring, drained by the first command's response.
     private var pendingWarnings: [String] = []
+
+    /// Commands against one session must not interleave. The actor alone does not
+    /// give us that: `await block(engine)` suspends, and actor reentrancy would
+    /// let a second command run against the same live page mid-flight.
+    private var isBusy = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     init(name: String, viewportWidth: Int, viewportHeight: Int, ephemeral: Bool = false) async {
         self.name = name
@@ -37,13 +41,9 @@ actor LiveSession {
     }
 
     func run(verbose: Bool, _ block: @escaping CommandRunner.CommandBlock) async throws -> CommandResult {
-        // The actor alone does not serialize this: `await block(engine)` suspends,
-        // and actor reentrancy would let a second command interleave against the
-        // same live page. The lock makes ordering well-defined.
-        await lock.acquire()
-        defer { lock.releaseSync() }
+        await acquire()
+        defer { release() }
 
-        lastUsed = Date()
         await MainActor.run { engine.verbose = verbose }
         return try await block(engine)
     }
@@ -53,7 +53,7 @@ actor LiveSession {
         return pendingWarnings
     }
 
-    /// Flush to disk and tear down. Called on eviction and on daemon shutdown —
+    /// Flush to disk and tear down. Called on eviction and on daemon shutdown --
     /// the snapshot is the durability layer, the live page is the source of truth.
     func shutdown() async {
         if !isEphemeral {
@@ -61,32 +61,25 @@ actor LiveSession {
         }
         await MainActor.run { engine.close() }
     }
-}
 
-/// Minimal FIFO async lock. Foundation has no async-safe mutex that can be held
-/// across a suspension point, and `DispatchSemaphore` would block the cooperative
-/// thread pool.
-actor AsyncLock {
-    private var isLocked = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    // MARK: - Serialization
 
-    func acquire() async {
-        if !isLocked {
-            isLocked = true
+    private func acquire() async {
+        guard isBusy else {
+            isBusy = true
             return
         }
         await withCheckedContinuation { waiters.append($0) }
     }
 
-    func release() {
+    /// Synchronous and actor-isolated, so `defer` can call it directly. Hoisting
+    /// this into a separate actor would force a fire-and-forget `Task` here,
+    /// since `defer` cannot await a hop to another actor.
+    private func release() {
         if waiters.isEmpty {
-            isLocked = false
+            isBusy = false
         } else {
             waiters.removeFirst().resume()
         }
-    }
-
-    nonisolated func releaseSync() {
-        Task { await release() }
     }
 }

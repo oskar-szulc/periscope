@@ -27,9 +27,7 @@ struct Find: ParsableCommand {
     var description: String
 
     func run() throws {
-        var query = Query(globals: globals, question: description)
-        query.find = true
-        try query.run()
+        Query.execute(globals: globals, prompt: description, findElement: true)
     }
 }
 
@@ -42,20 +40,14 @@ struct Query: ParsableCommand {
     @Argument(help: "Question about the page")
     var question: String
 
-    @Flag(name: .long, help: "Return a CSS selector instead of prose (see `find`)")
-    var find: Bool = false
-
-    init() {}
-
-    init(globals: GlobalOptions, question: String) {
-        self.globals = globals
-        self.question = question
+    func run() throws {
+        Self.execute(globals: globals, prompt: question, findElement: false)
     }
 
-    func run() throws {
+    static func execute(globals: GlobalOptions, prompt: String, findElement: Bool) {
         let isJson = globals.json
-        let isFind = find
-        let q = question
+        let isFind = findElement
+        let q = prompt
 
         CommandRunner.run(globals: globals) { engine in
             // Extract page summary

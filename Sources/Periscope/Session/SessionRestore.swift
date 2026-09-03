@@ -44,21 +44,22 @@ enum SessionRestore {
     }
 
     @MainActor
-    static func save(engine: BrowserEngine, session: String) async throws {
+    static func save(
+        engine: BrowserEngine, session: String,
+        viewport: String = "1920x1080", fallbackURL: String? = nil
+    ) async throws {
         let manager = SessionManager()
-        guard let url = engine.currentURL else { return }
+        guard let url = engine.currentURL ?? fallbackURL else { return }
 
         try manager.saveState(
-            SessionState(url: url, title: engine.currentTitle, viewport: "1920x1080"),
+            SessionState(url: url, title: engine.currentTitle, viewport: viewport),
             session: session)
 
         if let cookieStr = try await engine.runJavaScript("document.cookie") as? String, !cookieStr.isEmpty {
             let host = URL(string: url)?.host ?? ""
-            let cookies = cookieStr.split(separator: ";").map { pair in
-                let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
-                return PersistedCookie(
-                    name: String(parts[0]),
-                    value: parts.count > 1 ? String(parts[1]) : "",
+            let cookies = parseDocumentCookie(cookieStr).map {
+                PersistedCookie(
+                    name: $0.name, value: $0.value,
                     domain: host, path: "/", expires: nil, secure: false, httpOnly: false)
             }
             try manager.saveCookies(cookies, session: session)

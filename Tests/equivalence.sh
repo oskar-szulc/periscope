@@ -4,7 +4,8 @@
 # says the daemon is a transport change and not a behavior change.
 set -uo pipefail
 
-BIN="${1:-.build/release/Periscope}"
+# Absolute: the relative-path case runs the binary from other directories.
+BIN="$(cd "$(dirname "${1:-.build/release/Periscope}")" && pwd)/$(basename "${1:-.build/release/Periscope}")"
 FIXTURES="$(cd "$(dirname "$0")/../TestFixtures" && pwd)"
 PASS=0; FAIL=0
 
@@ -55,6 +56,29 @@ run_both "invalid url arg"   navigate "::::"
 run_both "cookie list"       cookie list
 run_both "json ok"           --json url
 run_both "json error"        --json navigate "https://nope-xyz.invalid/p"
+
+# Relative paths must resolve against the CLIENT's directory. The daemon runs in
+# whatever directory it was spawned from, so this silently wrote to the wrong
+# place while reporting success.
+check_relative_paths() {
+    local a="${TMPDIR:-/tmp}/eqv-dirA" b="${TMPDIR:-/tmp}/eqv-dirB"
+    mkdir -p "$a" "$b"; rm -f "$a/shot.png" "$b/shot.png"
+
+    ( cd "$a" && "$BIN" navigate "file://$FIXTURES/table.html" --session "$sess_daemon" >/dev/null 2>&1 )
+    ( cd "$b" && "$BIN" screenshot "shot.png" --session "$sess_daemon" >/dev/null 2>&1 )
+
+    if [[ -f "$b/shot.png" && ! -f "$a/shot.png" ]]; then
+        PASS=$((PASS+1)); printf '  ok   relative path resolves against client cwd\n'
+    else
+        FAIL=$((FAIL+1))
+        printf '  FAIL relative path: landed in %s\n' \
+            "$([[ -f "$a/shot.png" ]] && echo "daemon cwd" || echo "nowhere")"
+    fi
+    rm -rf "$a" "$b"
+}
+
+echo
+check_relative_paths
 
 echo
 echo "passed: $PASS  failed: $FAIL"
