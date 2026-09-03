@@ -2,9 +2,57 @@ import Foundation
 import AppKit
 
 enum CommandRunner {
-    typealias CommandBlock = @MainActor (BrowserEngine) async throws -> CommandResult
+    typealias CommandBlock = @MainActor @Sendable (BrowserEngine) async throws -> CommandResult
+
+    /// Set by the daemon while it executes a re-parsed command in-process.
+    ///
+    /// Every one of the 28 subcommands funnels through `run`, so intercepting here
+    /// means the daemon can reuse them verbatim — no command file knows transport
+    /// exists. Thread-local rather than global because the daemon handles each
+    /// connection on its own thread.
+    static var daemonExecution: DaemonExecution? {
+        get { Thread.current.threadDictionary["periscope.daemonExecution"] as? DaemonExecution }
+        set { Thread.current.threadDictionary["periscope.daemonExecution"] = newValue }
+    }
 
     static func run(globals: GlobalOptions, command: @escaping CommandBlock) {
+        // Inside the daemon: hand the block over instead of running it.
+        if let execution = daemonExecution {
+            execution.capture(command)
+            return
+        }
+
+        // The daemon keeps the page alive between commands, which is the whole
+        // reason it exists. If it is unreachable we run in-process instead --
+        // slower, but identical behavior, so no user is ever blocked by it.
+        if !globals.noDaemon, let response = DaemonClient.send(globals: globals) {
+            emitResponse(response, globals: globals)
+            return
+        }
+
+        runInProcess(globals: globals, command: command)
+    }
+
+    /// Print a daemon response exactly as in-process execution would have.
+    private static func emitResponse(_ response: Response, globals: GlobalOptions) {
+        let formatter = makeFormatter(json: globals.json)
+
+        for warning in response.warnings {
+            FileHandle.standardError.write(Data((warning + "\n").utf8))
+        }
+
+        if let error = response.error {
+            emit(error.message, formatter: formatter, globals: globals)
+            Foundation.exit(error.exitCode)
+        }
+        if let result = response.result {
+            print(formatter.format(result))
+        }
+    }
+
+    /// One-shot execution: boot an app, build an engine, restore, run, save, exit.
+    /// Still the fallback whenever the daemon is unavailable or `--no-daemon` is set.
+    static func runInProcess(globals: GlobalOptions, command: @escaping CommandBlock) {
         let formatter = makeFormatter(json: globals.json)
         let (width, height) = globals.viewportSize
 
@@ -17,39 +65,29 @@ enum CommandRunner {
                 }
 
                 do {
-                    // Restore session if applicable
                     if !globals.noSession {
-                        try await Self.restoreSession(engine: engine, session: globals.session)
+                        if let warning = try await SessionRestore.restore(
+                            engine: engine, session: globals.session) {
+                            FileHandle.standardError.write(Data((warning + "\n").utf8))
+                        }
                     }
 
-                    // Execute command with timeout
                     let result = try await withTimeout(seconds: globals.timeout) {
                         try await command(engine)
                     }
 
-                    // Save session if applicable
                     if !globals.noSession {
-                        try await Self.saveSession(engine: engine, session: globals.session)
+                        try await SessionRestore.save(engine: engine, session: globals.session)
                     }
 
                     print(formatter.format(result))
                     await MainActor.run { engine.close() }
                 } catch let error as PeriscopeError {
-                    let output = formatter.format(.error(error.description))
-                    if globals.json {
-                        print(output)
-                    } else {
-                        FileHandle.standardError.write(Data((output + "\n").utf8))
-                    }
+                    emit(error.description, formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(error.exitCode)
                 } catch {
-                    let output = formatter.format(.error(error.localizedDescription))
-                    if globals.json {
-                        print(output)
-                    } else {
-                        FileHandle.standardError.write(Data((output + "\n").utf8))
-                    }
+                    emit(error.localizedDescription, formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(1)
                 }
@@ -57,68 +95,22 @@ enum CommandRunner {
         }
     }
 
-    /// Reopen a session's last page so cookies and localStorage can be injected into it.
-    ///
-    /// A saved URL goes stale routinely — a stopped dev server, an expired share link —
-    /// and it is only a convenience, never what the user asked for. Failing to reach it
-    /// must not block the command they actually ran, so a navigation failure here warns
-    /// and continues. Cookie and storage injection needs a loaded page, so it is skipped
-    /// in that case.
-    @MainActor
-    private static func restoreSession(engine: BrowserEngine, session: String) async throws {
-        let manager = SessionManager()
-        if let state = try manager.loadState(session: session),
-           let url = URL(string: state.url) {
-            do {
-                _ = try await engine.navigate(to: url)
-            } catch let error as PeriscopeError {
-                let warning = "warning: session '\(session)' could not reopen \(state.url) "
-                    + "(\(error.description)); continuing without restored cookies and storage\n"
-                FileHandle.standardError.write(Data(warning.utf8))
-                return
-            }
-
-            let cookies = try manager.loadCookies(session: session)
-            if !cookies.isEmpty {
-                let js = cookies.map { c in
-                    "document.cookie = '\(c.name)=\(c.value); path=\(c.path); domain=\(c.domain)"
-                    + (c.secure ? "; secure" : "") + "';"
-                }.joined(separator: "\n")
-                try await engine.runJavaScriptVoid(js)
-            }
-
-            if let storage = try manager.loadStorage(session: session) {
-                try await engine.runJavaScriptVoid(StorageManager.injectionScript(for: storage))
-            }
+    private static func emit(_ message: String, formatter: OutputFormatting, globals: GlobalOptions) {
+        let output = formatter.format(.error(message))
+        if globals.json {
+            print(output)
+        } else {
+            FileHandle.standardError.write(Data((output + "\n").utf8))
         }
     }
+}
 
-    @MainActor
-    private static func saveSession(engine: BrowserEngine, session: String) async throws {
-        let manager = SessionManager()
-        guard let url = engine.currentURL else { return }
+/// Carries a command block out of a subcommand's synchronous `run()` so the
+/// daemon can execute it against a live session instead of a fresh engine.
+final class DaemonExecution: @unchecked Sendable {
+    private(set) var block: CommandRunner.CommandBlock?
 
-        try manager.saveState(
-            SessionState(url: url, title: engine.currentTitle, viewport: "1920x1080"),
-            session: session)
-
-        if let cookieStr = try await engine.runJavaScript("document.cookie") as? String, !cookieStr.isEmpty {
-            let host = URL(string: url)?.host ?? ""
-            let cookies = cookieStr.split(separator: ";").map { pair in
-                let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
-                return PersistedCookie(
-                    name: String(parts[0]),
-                    value: parts.count > 1 ? String(parts[1]) : "",
-                    domain: host, path: "/", expires: nil, secure: false, httpOnly: false)
-            }
-            try manager.saveCookies(cookies, session: session)
-        }
-
-        if let json = try await engine.runJavaScript(StorageManager.extractionScript()) as? String,
-           let data = json.data(using: .utf8),
-           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
-            let origin = URL(string: url).map { "\($0.scheme ?? "https")://\($0.host ?? "")" } ?? url
-            try manager.saveStorage(PersistedStorage(origin: origin, localStorage: dict), session: session)
-        }
+    func capture(_ block: @escaping CommandRunner.CommandBlock) {
+        self.block = block
     }
 }

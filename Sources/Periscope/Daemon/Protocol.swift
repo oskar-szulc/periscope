@@ -1,0 +1,167 @@
+import Foundation
+
+/// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
+/// A client and daemon that disagree cannot safely talk, so the daemon shuts
+/// down on mismatch and the client respawns it — see `DaemonClient`.
+let periscopeProtocolVersion = 1
+
+enum DaemonPaths {
+    /// Runtime state lives beside the sessions it serves.
+    static var runDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".periscope/run")
+    }
+
+    static var socket: URL { runDirectory.appendingPathComponent("sock") }
+    static var lock: URL { runDirectory.appendingPathComponent("lock") }
+
+    /// The socket is the authentication boundary: 0700 on the directory means
+    /// only the owning uid can reach it.
+    static func ensureRunDirectory() throws {
+        try FileManager.default.createDirectory(
+            at: runDirectory, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
+    }
+}
+
+// MARK: - Wire types
+
+struct GlobalOptionsPayload: Codable, Sendable {
+    var session: String
+    var noSession: Bool
+    var json: Bool
+    var timeout: Int
+    var viewport: String
+    var userAgent: String?
+    var wait: String?
+    var verbose: Bool
+    var strict: Bool
+
+    init(_ g: GlobalOptions) {
+        session = g.session
+        noSession = g.noSession
+        json = g.json
+        timeout = g.timeout
+        viewport = g.viewport
+        userAgent = g.userAgent
+        wait = g.wait
+        verbose = g.verbose
+        strict = g.strict
+    }
+
+    /// ArgumentParser types cannot be constructed directly -- their property
+    /// wrappers are only populated by parsing -- so control requests, which carry
+    /// no user options, build the payload themselves.
+    static let controlDefault = GlobalOptionsPayload(
+        session: "default", noSession: true, json: false, timeout: 30,
+        viewport: "1920x1080", userAgent: nil, wait: nil, verbose: false, strict: false)
+
+    private init(session: String, noSession: Bool, json: Bool, timeout: Int,
+                 viewport: String, userAgent: String?, wait: String?,
+                 verbose: Bool, strict: Bool) {
+        self.session = session
+        self.noSession = noSession
+        self.json = json
+        self.timeout = timeout
+        self.viewport = viewport
+        self.userAgent = userAgent
+        self.wait = wait
+        self.verbose = verbose
+        self.strict = strict
+    }
+
+    var viewportSize: (width: Int, height: Int) {
+        let parts = viewport.split(separator: "x").compactMap { Int($0) }
+        guard parts.count == 2 else { return (1920, 1080) }
+        return (parts[0], parts[1])
+    }
+}
+
+enum ControlVerb: String, Codable, Sendable {
+    case status
+    case stop
+}
+
+struct SessionInfoPayload: Codable, Sendable {
+    var name: String
+    var idleSeconds: Int
+}
+
+struct DaemonStatusPayload: Codable, Sendable {
+    var pid: Int32
+    var uptimeSeconds: Int
+    var protocolVersion: Int
+    var sessions: [SessionInfoPayload]
+}
+
+struct Request: Codable, Sendable {
+    var protocolVersion: Int = periscopeProtocolVersion
+    /// Lifecycle request rather than a browser command. Set by `daemon status|stop`.
+    var control: ControlVerb?
+    /// The full argument vector as the user typed it, minus argv[0].
+    /// The daemon re-parses it with ArgumentParser so the client and daemon
+    /// cannot drift on how a command is interpreted.
+    var arguments: [String]
+    var options: GlobalOptionsPayload
+}
+
+struct ErrorPayload: Codable, Sendable {
+    var code: String
+    var message: String
+    var exitCode: Int32
+    var url: String?
+    var underlying: Int?
+
+    init(code: String, message: String, exitCode: Int32, url: String? = nil, underlying: Int? = nil) {
+        self.code = code
+        self.message = message
+        self.exitCode = exitCode
+        self.url = url
+        self.underlying = underlying
+    }
+
+    init(_ error: PeriscopeError) {
+        self.init(code: error.wireCode, message: error.description, exitCode: error.exitCode)
+        if case .navigationFailed(let url, _) = error, !url.isEmpty {
+            self.url = url
+        }
+    }
+}
+
+struct Response: Codable, Sendable {
+    var result: CommandResult?
+    var error: ErrorPayload?
+    var status: DaemonStatusPayload?
+    /// Emitted on the *client's* stderr. The daemon's own stderr is not the
+    /// user's terminal, so degradation notices have to travel back over the wire.
+    var warnings: [String] = []
+
+    static func ok(_ result: CommandResult, warnings: [String] = []) -> Response {
+        Response(result: result, error: nil, status: nil, warnings: warnings)
+    }
+
+    static func failure(_ error: ErrorPayload, warnings: [String] = []) -> Response {
+        Response(result: nil, error: error, status: nil, warnings: warnings)
+    }
+
+    static func status(_ payload: DaemonStatusPayload) -> Response {
+        Response(result: nil, error: nil, status: payload, warnings: [])
+    }
+}
+
+extension PeriscopeError {
+    /// Stable, machine-readable counterpart to `description`, so scripts can
+    /// branch on failure without regex-matching English.
+    var wireCode: String {
+        switch self {
+        case .elementNotFound: return "ELEMENT_NOT_FOUND"
+        case .multipleElementsFound: return "MULTIPLE_ELEMENTS_FOUND"
+        case .navigationFailed: return "NAVIGATION_FAILED"
+        case .timeout: return "TIMEOUT"
+        case .sessionError: return "SESSION_ERROR"
+        case .javaScriptError: return "JAVASCRIPT_ERROR"
+        case .argumentError: return "ARGUMENT_ERROR"
+        case .screenshotFailed: return "SCREENSHOT_FAILED"
+        }
+    }
+}

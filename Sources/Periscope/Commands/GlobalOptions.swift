@@ -28,6 +28,9 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "Error if selector matches multiple elements")
     var strict: Bool = false
 
+    @Flag(name: .long, help: "Run in-process instead of via the session daemon")
+    var noDaemon: Bool = false
+
     var viewportSize: (width: Int, height: Int) {
         let parts = viewport.split(separator: "x").compactMap { Int($0) }
         guard parts.count == 2 else { return (1920, 1080) }

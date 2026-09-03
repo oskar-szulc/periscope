@@ -1,11 +1,11 @@
 import Foundation
 
-struct LinkItem: Sendable {
+struct LinkItem: Sendable, Codable {
     let text: String
     let url: String
 }
 
-struct ElementItem: Sendable {
+struct ElementItem: Sendable, Codable {
     let index: Int
     let tag: String
     let id: String?
@@ -13,19 +13,19 @@ struct ElementItem: Sendable {
     let text: String
 }
 
-struct CookieItem: Sendable {
+struct CookieItem: Sendable, Codable {
     let name: String
     let value: String
     let domain: String
 }
 
-struct HistoryItem: Sendable {
+struct HistoryItem: Sendable, Codable {
     let title: String?
     let url: String
     let isCurrent: Bool
 }
 
-enum CommandResult: Sendable {
+enum CommandResult: Sendable, Codable {
     case navigate(title: String?, url: String)
     case extract(content: String)
     case html(content: String)
