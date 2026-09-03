@@ -4,7 +4,8 @@ import WebKit
 @MainActor
 final class BrowserEngine {
     let windowController: HiddenWindowController
-    private var webView: WKWebView { windowController.webView }
+    private var page: WebPage { windowController.page }
+    var verbose: Bool = false
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
         self.windowController = HiddenWindowController(
@@ -15,54 +16,115 @@ final class BrowserEngine {
 
     // MARK: - Navigation
 
+    /// Navigate to a URL using the WebPage AsyncSequence navigation API.
+    /// Awaits the `.finished` event instead of polling `isLoading`.
     func navigate(to url: URL) async throws -> (title: String?, url: String) {
-        webView.load(URLRequest(url: url))
-        try await waitForLoad()
-        let title = try await webView.evaluateJavaScript("document.title") as? String
-        return (title, webView.url?.absoluteString ?? url.absoluteString)
+        let events = page.load(URLRequest(url: url))
+        try await awaitNavigation(events)
+        let title = await resolveTitle()
+        return (title, page.url?.absoluteString ?? url.absoluteString)
     }
 
     func goBack() async throws -> (title: String?, url: String) {
-        guard webView.canGoBack else {
+        let list = page.backForwardList
+        guard let backItem = list.backList.last else {
             throw PeriscopeError.navigationFailed(url: "", reason: "No back history")
         }
-        webView.goBack()
-        try await waitForLoad()
-        let title = try await webView.evaluateJavaScript("document.title") as? String
-        return (title, webView.url?.absoluteString ?? "")
+        let events = page.load(backItem)
+        try await awaitNavigation(events)
+        let title = await resolveTitle()
+        return (title, page.url?.absoluteString ?? "")
     }
 
     func goForward() async throws -> (title: String?, url: String) {
-        guard webView.canGoForward else {
+        let list = page.backForwardList
+        guard let forwardItem = list.forwardList.first else {
             throw PeriscopeError.navigationFailed(url: "", reason: "No forward history")
         }
-        webView.goForward()
-        try await waitForLoad()
-        let title = try await webView.evaluateJavaScript("document.title") as? String
-        return (title, webView.url?.absoluteString ?? "")
+        let events = page.load(forwardItem)
+        try await awaitNavigation(events)
+        let title = await resolveTitle()
+        return (title, page.url?.absoluteString ?? "")
     }
 
     func reload() async throws -> (title: String?, url: String) {
-        webView.reload()
-        try await waitForLoad()
-        let title = try await webView.evaluateJavaScript("document.title") as? String
-        return (title, webView.url?.absoluteString ?? "")
+        let events = page.reload()
+        try await awaitNavigation(events)
+        let title = await resolveTitle()
+        return (title, page.url?.absoluteString ?? "")
     }
 
-    var currentURL: String? { webView.url?.absoluteString }
-    var currentTitle: String? { webView.title }
+    var currentURL: String? { page.url?.absoluteString }
+    var currentTitle: String? { page.title.isEmpty ? nil : page.title }
+
+    /// Resolve the page title, using JS as fallback since the observable
+    /// `page.title` may not have updated yet after navigation completes.
+    private func resolveTitle() async -> String? {
+        if !page.title.isEmpty { return page.title }
+        // page.title hasn't propagated yet — get it from the DOM directly
+        let jsTitle = try? await runJavaScript("document.title") as? String
+        if let jsTitle, !jsTitle.isEmpty { return jsTitle }
+        return nil
+    }
+
+    // MARK: - Navigation Event Handling
+
+    /// Await a navigation's AsyncSequence until `.finished`, logging events if verbose.
+    /// If the sequence throws (e.g. a redirect cancels the provisional navigation),
+    /// fall back to polling until the replacement navigation completes.
+    private func awaitNavigation(_ events: some AsyncSequence<WebPage.NavigationEvent, any Error>) async throws {
+        do {
+            for try await event in events {
+                if verbose {
+                    FileHandle.standardError.write(Data("nav: \(event)\n".utf8))
+                }
+                if event == .finished { return }
+            }
+        } catch let navError as WebPage.NavigationError {
+            switch navError {
+            case .failedProvisionalNavigation(let underlying):
+                throw PeriscopeError.navigationFailed(
+                    url: page.url?.absoluteString ?? "",
+                    reason: underlying.localizedDescription)
+            case .pageClosed:
+                throw PeriscopeError.navigationFailed(url: "", reason: "Page was closed")
+            case .webContentProcessTerminated:
+                throw PeriscopeError.navigationFailed(url: "", reason: "Web content process terminated")
+            case .invalidURL:
+                throw PeriscopeError.navigationFailed(url: "", reason: "Invalid URL")
+            @unknown default:
+                throw PeriscopeError.navigationFailed(url: "", reason: "\(navError)")
+            }
+        } catch {
+            // Non-navigation error (e.g. cancellation). Fall back to polling.
+            if verbose {
+                FileHandle.standardError.write(Data("nav: unexpected error: \(error), falling back\n".utf8))
+            }
+            while page.isLoading {
+                try await Task.sleep(for: .milliseconds(50))
+            }
+        }
+    }
 
     // MARK: - JavaScript
 
+    /// Execute JavaScript on the current page.
+    /// WebPage.callJavaScript treats the script as a function body,
+    /// so we prepend `return` to get the expression result back.
     func runJavaScript(_ script: String) async throws -> Any? {
-        try await webView.evaluateJavaScript(script)
+        try await page.callJavaScript("return \(script)")
+    }
+
+    /// Execute JavaScript without expecting a return value (side-effects only).
+    func runJavaScriptVoid(_ script: String) async throws {
+        _ = try await page.callJavaScript(script)
     }
 
     // MARK: - History
 
     func getHistory() async throws -> [HistoryItem] {
         var items: [HistoryItem] = []
-        let list = webView.backForwardList
+        let list = page.backForwardList
         for item in list.backList {
             items.append(HistoryItem(title: item.title, url: item.url.absoluteString, isCurrent: false))
         }
@@ -78,14 +140,20 @@ final class BrowserEngine {
     // MARK: - Wait
 
     func waitForLoad() async throws {
-        // Poll isLoading
-        while webView.isLoading {
-            try await Task.sleep(for: .milliseconds(50))
+        // Use the navigations stream to wait for the current load to finish,
+        // falling back to polling if no navigation is in progress.
+        if page.isLoading {
+            for try await event in page.navigations {
+                if verbose {
+                    FileHandle.standardError.write(Data("nav: \(event)\n".utf8))
+                }
+                if event == .finished { break }
+            }
         }
     }
 
     func installFetchMonitor() async throws {
-        _ = try await runJavaScript(FetchQuietMonitor.installScript)
+        try await runJavaScriptVoid(FetchQuietMonitor.installScript)
     }
 
     func waitFor(_ strategy: WaitStrategy) async throws {
@@ -97,12 +165,12 @@ final class BrowserEngine {
             while true {
                 while true {
                     let quiet = try await runJavaScript(FetchQuietMonitor.checkScript) as? Bool ?? true
-                    if quiet && !webView.isLoading { break }
+                    if quiet && !page.isLoading { break }
                     try await Task.sleep(for: .milliseconds(100))
                 }
                 try await Task.sleep(for: .milliseconds(500))
                 let stillQuiet = try await runJavaScript(FetchQuietMonitor.checkScript) as? Bool ?? true
-                if stillQuiet && !webView.isLoading { break }
+                if stillQuiet && !page.isLoading { break }
             }
         case .selector(let css):
             while true {
@@ -134,27 +202,23 @@ final class BrowserEngine {
     }
 
     /// Wait for the URL to change away from `initialPath`, or for an explicit condition.
-    /// Used by the `login` command to detect when the user has logged in.
     func waitForLoginCompletion(initialURL: URL, until: String?) async throws {
         let initialPath = initialURL.path
 
         while true {
             if let until {
-                // Explicit condition
                 if until.hasPrefix("selector:") {
                     let css = String(until.dropFirst("selector:".count))
                     let exists = try await runJavaScript(ElementResolver.existsScript(selector: css)) as? Bool ?? false
                     if exists { break }
                 } else if until.hasPrefix("url:") {
                     let pattern = String(until.dropFirst("url:".count))
-                    if let currentURL = webView.url?.absoluteString, currentURL.contains(pattern) { break }
+                    if let currentURL = page.url?.absoluteString, currentURL.contains(pattern) { break }
                 }
             } else {
-                // Auto-detect: URL path changed away from login page
-                if let currentURL = webView.url {
+                if let currentURL = page.url {
                     let currentPath = currentURL.path
-                    if currentPath != initialPath && !webView.isLoading {
-                        // Wait a bit for the page to settle
+                    if currentPath != initialPath && !page.isLoading {
                         try await Task.sleep(for: .milliseconds(1000))
                         break
                     }
@@ -170,70 +234,59 @@ final class BrowserEngine {
 
     // MARK: - Screenshot
 
+    /// Take a screenshot using WebPage.exported(as:) for native image capture.
     func takeScreenshot(full: Bool) async throws -> Data {
+        let config: WebPage.ExportedContentConfiguration
         if full {
-            let height = try await runJavaScript("Math.min(document.body.scrollHeight, 16384)") as? Int ?? 1080
-            let width = Int(windowController.window.frame.width)
-            windowController.resize(width: width, height: height)
-            try await Task.sleep(for: .milliseconds(200))
-            let data = try await captureWindow()
-            windowController.resize(width: width, height: 1080)
-            return data
+            config = .image(region: .contents)
+        } else {
+            config = .image()
         }
-        return try await captureWindow()
+        return try await page.exported(as: config)
     }
 
-    private func captureWindow() async throws -> Data {
-        guard let view = windowController.window.contentView else {
-            throw PeriscopeError.screenshotFailed(reason: "No content view")
-        }
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
-            throw PeriscopeError.screenshotFailed(reason: "Failed to create bitmap")
-        }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else {
-            throw PeriscopeError.screenshotFailed(reason: "Failed to encode PNG")
-        }
-        return png
+    /// Export the current page as a PDF.
+    func exportPDF() async throws -> Data {
+        try await page.exported(as: .pdf())
     }
 
     // MARK: - Interaction
 
     func click(selector: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        _ = try await runJavaScript(ElementResolver.clickScript(selector: selector))
+        try await runJavaScriptVoid(ElementResolver.clickScript(selector: selector))
     }
 
     func fill(selector: String, value: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        _ = try await runJavaScript(ElementResolver.fillScript(selector: selector, value: value))
+        try await runJavaScriptVoid(ElementResolver.fillScript(selector: selector, value: value))
     }
 
     func selectOption(selector: String, value: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        _ = try await runJavaScript(ElementResolver.selectScript(selector: selector, value: value))
+        try await runJavaScriptVoid(ElementResolver.selectScript(selector: selector, value: value))
     }
 
     func setChecked(selector: String, checked: Bool, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        _ = try await runJavaScript(ElementResolver.checkScript(selector: selector, checked: checked))
+        try await runJavaScriptVoid(ElementResolver.checkScript(selector: selector, checked: checked))
     }
 
     func submit(selector: String?) async throws {
         if let selector { try await resolveElement(selector: selector, strict: false) }
-        _ = try await runJavaScript(ElementResolver.submitScript(selector: selector))
+        try await runJavaScriptVoid(ElementResolver.submitScript(selector: selector))
     }
 
     func scroll(target: String) async throws {
         if !["up", "down", "top", "bottom"].contains(target) {
             try await resolveElement(selector: target, strict: false)
         }
-        _ = try await runJavaScript(ElementResolver.scrollScript(target: target))
+        try await runJavaScriptVoid(ElementResolver.scrollScript(target: target))
     }
 
     func hover(selector: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        _ = try await runJavaScript(ElementResolver.hoverScript(selector: selector))
+        try await runJavaScriptVoid(ElementResolver.hoverScript(selector: selector))
     }
 
     // MARK: - Extraction

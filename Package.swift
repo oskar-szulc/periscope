@@ -1,10 +1,10 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "Periscope",
     platforms: [
-        .macOS(.v15)  // Will change to macOS 26 when SDK is available; .v15 for now to bootstrap
+        .macOS(.v26)
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),

@@ -4,17 +4,11 @@ import WebKit
 
 @MainActor
 final class HiddenWindowController {
+    let page: WebPage
     let window: NSWindow
-    // Will become: let page: WebPage
-    // For now, use WKWebView as a stand-in
-    let webView: WKWebView
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
-        let config = WKWebViewConfiguration()
-        self.webView = WKWebView(
-            frame: NSRect(x: 0, y: 0, width: viewportWidth, height: viewportHeight),
-            configuration: config
-        )
+        self.page = WebPage()
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: viewportWidth, height: viewportHeight),
@@ -26,7 +20,7 @@ final class HiddenWindowController {
         window.alphaValue = 0.01
         window.level = .init(rawValue: -1000)
         window.collectionBehavior = [.stationary, .canJoinAllSpaces, .ignoresCycle]
-        window.contentView = webView
+        window.contentView = NSHostingView(rootView: WebView(page))
         window.orderFront(nil)
         self.window = window
     }

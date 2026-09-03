@@ -21,7 +21,7 @@ struct CookieSetCmd: ParsableCommand {
             if let domain { parts.append("domain=\(domain)") }
             if secure { parts.append("secure") }
             let cookieStr = parts.joined(separator: "; ")
-            _ = try await engine.runJavaScript("document.cookie = \(ElementResolver.jsString(cookieStr))")
+            try await engine.runJavaScriptVoid("document.cookie = \(ElementResolver.jsString(cookieStr))")
             return .plain("Cookie set: \(name)")
         }
     }
@@ -34,7 +34,7 @@ struct CookieDeleteCmd: ParsableCommand {
     func run() throws {
         CommandRunner.run(globals: globals) { engine in
             let cookieStr = "\(name)=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"
-            _ = try await engine.runJavaScript("document.cookie = \(ElementResolver.jsString(cookieStr))")
+            try await engine.runJavaScriptVoid("document.cookie = \(ElementResolver.jsString(cookieStr))")
             return .plain("Cookie deleted: \(name)")
         }
     }

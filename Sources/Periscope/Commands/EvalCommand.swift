@@ -21,7 +21,17 @@ struct Eval: ParsableCommand {
             } else {
                 script = code!
             }
-            let result = try await engine.runJavaScript(script)
+            // callJavaScript treats the script as a function body, so user
+            // scripts that are simple expressions work with auto-prepended return.
+            // For multi-statement scripts, wrap in eval() so the last expression
+            // value is returned. This is safe here since the eval command's entire
+            // purpose is to execute arbitrary user-provided JavaScript.
+            let result: Any?
+            if script.contains(";") || script.contains("\n") {
+                result = try await engine.runJavaScript("eval(\(ElementResolver.jsString(script)))")
+            } else {
+                result = try await engine.runJavaScript(script)
+            }
             let str: String?
             if let result {
                 if let s = result as? String { str = s }

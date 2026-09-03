@@ -11,7 +11,9 @@ enum CommandRunner {
         MainActor.assumeIsolated {
             AppRunner.run {
                 let engine = await MainActor.run {
-                    BrowserEngine(viewportWidth: width, viewportHeight: height)
+                    let e = BrowserEngine(viewportWidth: width, viewportHeight: height)
+                    e.verbose = globals.verbose
+                    return e
                 }
 
                 do {
@@ -68,11 +70,11 @@ enum CommandRunner {
                     "document.cookie = '\(c.name)=\(c.value); path=\(c.path); domain=\(c.domain)"
                     + (c.secure ? "; secure" : "") + "';"
                 }.joined(separator: "\n")
-                _ = try await engine.runJavaScript(js)
+                try await engine.runJavaScriptVoid(js)
             }
 
             if let storage = try manager.loadStorage(session: session) {
-                _ = try await engine.runJavaScript(StorageManager.injectionScript(for: storage))
+                try await engine.runJavaScriptVoid(StorageManager.injectionScript(for: storage))
             }
         }
     }

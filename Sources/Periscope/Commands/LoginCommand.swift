@@ -88,7 +88,7 @@ struct Login: ParsableCommand {
                         "document.cookie = '\(c.name)=\(c.value); path=\(c.path); domain=\(c.domain)"
                         + (c.secure ? "; secure" : "") + "';"
                     }.joined(separator: "\n")
-                    _ = try? await engine.runJavaScript(js)
+                    try? await engine.runJavaScriptVoid(js)
                 }
             }
         }
