@@ -13,21 +13,6 @@ enum BlockKind: String, Sendable, Codable {
 /// Recognises the challenge pages agents actually run into. Kept deliberately
 /// narrow: a generic "has a reCAPTCHA iframe" rule would flag every login form.
 enum BlockDetector {
-    /// What `classify` needs, gathered in one JavaScript round trip.
-    static let probeScript = """
-    JSON.stringify({
-        url: location.href,
-        title: document.title || '',
-        text: (document.body && document.body.innerText || '').slice(0, 4000)
-    })
-    """
-
-    struct Probe: Decodable {
-        var url: String
-        var title: String
-        var text: String
-    }
-
     static func classify(url: String, title: String, text: String) -> BlockKind? {
         let url = url.lowercased()
         let title = title.lowercased()

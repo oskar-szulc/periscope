@@ -169,9 +169,14 @@ enum ElementResolver {
     })
     """
 
-    /// Wrap a script body so `P` is the prelude object and `T` the target.
+    /// Injected once at document start (see HiddenWindowController) so every
+    /// action and `state` reference one resolver object instead of re-shipping
+    /// and re-parsing the ~140-line prelude in each generated script.
+    static var installScript: String { "if (!window.__periscope) window.__periscope = (\(preludeJS))();" }
+
+    /// Wrap a script body so `P` is the resolver and `T` the target.
     private static func wrap(target: String, _ body: String) -> String {
-        "(function() { var P = (\(preludeJS))(); var T = \(jsString(target)); \(body) })()"
+        "(function() { var P = window.__periscope; var T = \(jsString(target)); \(body) })()"
     }
 
     static func countScript(selector: String) -> String {
@@ -256,7 +261,7 @@ enum ElementResolver {
         let find = selector.map { "var el = P.query(\(jsString($0)))[0]; var form = el.tagName === 'FORM' ? el : (el.form || el.closest('form'));" }
             ?? "var form = document.forms[0];"
         return """
-        (function() { var P = (\(preludeJS))(); \(find)
+        (function() { var P = window.__periscope; \(find)
             if (!form) throw new Error('No form found');
             form.requestSubmit ? form.requestSubmit() : form.submit();
         })()

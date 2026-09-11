@@ -23,12 +23,8 @@ struct Requests: ParsableCommand {
             try await engine.settleRequests(maxMs: settle)
             var items = try await engine.recordedRequests()
             if let match {
-                guard let regex = try? NSRegularExpression(pattern: match) else {
-                    throw PeriscopeError.argumentError(reason: "Invalid --match regex: \(match)")
-                }
-                items = items.filter {
-                    regex.firstMatch(in: $0.url, range: NSRange($0.url.startIndex..., in: $0.url)) != nil
-                }
+                let matches = try RegexFilter.matcher(match)
+                items = items.filter { matches($0.url) }
             }
             if unresolved { items = items.filter { $0.status == nil } }
             return .requests(items)

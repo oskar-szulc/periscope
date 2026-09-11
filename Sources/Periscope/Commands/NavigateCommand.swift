@@ -7,18 +7,31 @@ import Foundation
 /// `--wait` used to be honoured by `click` alone, so `navigate --wait time:4000`
 /// silently did nothing and an SPA job board read as nine bytes of asterisks.
 enum NavigationReport {
+    /// The shared body of every navigation command: parse `--wait`, run the
+    /// navigation, then report. Parsing `--wait` inside the runner means a typo
+    /// exits like any other argument error rather than being ignored.
+    static func run(
+        globals: GlobalOptions,
+        navigate: @escaping @MainActor @Sendable (BrowserEngine) async throws -> String
+    ) {
+        CommandRunner.run(globals: globals) { engine in
+            let wait = try globals.waitStrategy(default: .navigateDefault)
+            let url = try await navigate(engine)
+            return try await make(engine: engine, wait: wait, fallbackURL: url)
+        }
+    }
+
     @MainActor
     static func make(engine: BrowserEngine, wait: WaitStrategy, fallbackURL: String) async throws -> CommandResult {
         try await engine.waitFor(wait)
 
         let url = engine.currentURL ?? fallbackURL
-        if let kind = try await engine.detectBlock() {
+        // One look at the settled page: title, text size and challenge check.
+        let page = try await engine.observePage()
+        if let kind = page.blocked {
             throw PeriscopeError.blocked(kind: kind, url: url)
         }
-        // Title is re-read after the wait: an SPA sets it from JavaScript.
-        let title = await engine.resolveTitle()
-        let chars = await engine.measureTextChars()
-        return .navigate(title: title, url: url, status: engine.lastStatusCode, textChars: chars)
+        return .navigate(title: page.title, url: url, status: engine.lastStatusCode, textChars: page.textChars)
     }
 }
 
@@ -31,14 +44,7 @@ struct Navigate: ParsableCommand {
         guard let parsedURL = URL(string: url) else {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
-        let globals = globals
-        CommandRunner.run(globals: globals) { engine in
-            // Parsed before the load so a typo fails fast, and inside the runner
-            // so it exits 4 like every other argument error.
-            let wait = try globals.waitStrategy(default: .navigateDefault)
-            let (_, finalURL) = try await engine.navigate(to: parsedURL)
-            return try await NavigationReport.make(engine: engine, wait: wait, fallbackURL: finalURL)
-        }
+        NavigationReport.run(globals: globals) { try await $0.navigate(to: parsedURL) }
     }
 }
 
@@ -46,14 +52,7 @@ struct Back: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Go back in history")
     @OptionGroup var globals: GlobalOptions
     func run() throws {
-        let globals = globals
-        CommandRunner.run(globals: globals) { engine in
-            // Parsed before the load so a typo fails fast, and inside the runner
-            // so it exits 4 like every other argument error.
-            let wait = try globals.waitStrategy(default: .navigateDefault)
-            let (_, url) = try await engine.goBack()
-            return try await NavigationReport.make(engine: engine, wait: wait, fallbackURL: url)
-        }
+        NavigationReport.run(globals: globals) { try await $0.goBack() }
     }
 }
 
@@ -61,14 +60,7 @@ struct Forward: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Go forward in history")
     @OptionGroup var globals: GlobalOptions
     func run() throws {
-        let globals = globals
-        CommandRunner.run(globals: globals) { engine in
-            // Parsed before the load so a typo fails fast, and inside the runner
-            // so it exits 4 like every other argument error.
-            let wait = try globals.waitStrategy(default: .navigateDefault)
-            let (_, url) = try await engine.goForward()
-            return try await NavigationReport.make(engine: engine, wait: wait, fallbackURL: url)
-        }
+        NavigationReport.run(globals: globals) { try await $0.goForward() }
     }
 }
 
@@ -76,14 +68,7 @@ struct Reload: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Reload current page")
     @OptionGroup var globals: GlobalOptions
     func run() throws {
-        let globals = globals
-        CommandRunner.run(globals: globals) { engine in
-            // Parsed before the load so a typo fails fast, and inside the runner
-            // so it exits 4 like every other argument error.
-            let wait = try globals.waitStrategy(default: .navigateDefault)
-            let (_, url) = try await engine.reload()
-            return try await NavigationReport.make(engine: engine, wait: wait, fallbackURL: url)
-        }
+        NavigationReport.run(globals: globals) { try await $0.reload() }
     }
 }
 

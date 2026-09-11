@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 3
+let periscopeProtocolVersion = 4
 
 enum DaemonPaths {
     /// Runtime state lives beside the sessions it serves.
@@ -33,22 +33,19 @@ struct GlobalOptionsPayload: Codable, Sendable {
     var timeout: Int
     var viewport: String
     var userAgent: String?
-    var wait: String?
     var verbose: Bool
-    var strict: Bool
-    var first: Bool = false
 
+    // Interaction flags (--wait, --first/--strict) are not carried here: the
+    // daemon re-parses the argument vector, so it reads them from argv, and a
+    // duplicate on the wire could only drift out of sync with no consumer.
     init(_ g: GlobalOptions) {
-        first = g.first
         session = g.session
         noSession = g.noSession
         json = g.json
         timeout = g.timeout
         viewport = g.viewport
         userAgent = g.userAgent
-        wait = g.wait
         verbose = g.verbose
-        strict = g.strict
     }
 
     /// Shares the parser's implementation so the two cannot drift on the

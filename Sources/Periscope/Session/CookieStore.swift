@@ -71,11 +71,3 @@ enum CookieStore {
     }
 }
 
-/// Split a `document.cookie` string into name/value pairs.
-func parseDocumentCookie(_ raw: String) -> [(name: String, value: String)] {
-    raw.split(separator: ";").compactMap { pair in
-        let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)
-        guard let name = parts.first else { return nil }
-        return (String(name), parts.count > 1 ? String(parts[1]) : "")
-    }
-}

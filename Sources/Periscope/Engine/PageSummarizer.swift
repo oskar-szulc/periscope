@@ -42,7 +42,7 @@ enum PageSummarizer {
             result.truncated = full.length > TEXT_LIMIT;
         }
 
-        var P = (\(ElementResolver.preludeJS))();
+        var P = window.__periscope;
         function isVisible(el) { return P.visible(el); }
         function selectorFor(el) { return P.selectorFor(el); }
 

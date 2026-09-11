@@ -37,14 +37,16 @@ struct State: ParsableCommand {
         let json = globals.json
 
         CommandRunner.run(globals: globals) { engine in
-            guard let raw = try await engine.runJavaScript(
-                PageSummarizer.extractScript) as? String,
-                let data = raw.data(using: .utf8) else {
+            guard let decoded: PageStateData = try await engine.runJavaScriptDecoded(
+                PageSummarizer.extractScript) else {
                 throw PeriscopeError.javaScriptError(reason: "Failed to extract page state")
             }
 
-            var state = try JSONDecoder().decode(PageStateData.self, from: data)
-            state.blocked = try await engine.detectBlock()?.rawValue
+            var state = decoded
+            // The block markers live in the first few hundred chars of the text
+            // `state` already fetched, so classify here instead of a second probe.
+            state.blocked = BlockDetector.classify(
+                url: state.url, title: state.title, text: state.text)?.rawValue
 
             if actionsOnly {
                 state.text = ""

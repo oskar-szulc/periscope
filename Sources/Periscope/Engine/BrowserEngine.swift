@@ -18,15 +18,14 @@ final class BrowserEngine {
 
     /// Navigate to a URL using the WebPage AsyncSequence navigation API.
     /// Awaits the `.finished` event instead of polling `isLoading`.
-    func navigate(to url: URL) async throws -> (title: String?, url: String) {
+    func navigate(to url: URL) async throws -> String {
         windowController.responseRecorder.reset()
         let events = page.load(URLRequest(url: url))
         try await awaitNavigation(events, target: url.absoluteString)
-        let title = await resolveTitle()
-        return (title, page.url?.absoluteString ?? url.absoluteString)
+        return page.url?.absoluteString ?? url.absoluteString
     }
 
-    func goBack() async throws -> (title: String?, url: String) {
+    func goBack() async throws -> String {
         let list = page.backForwardList
         guard let backItem = list.backList.last else {
             throw PeriscopeError.navigationFailed(
@@ -35,11 +34,10 @@ final class BrowserEngine {
         windowController.responseRecorder.reset()
         let events = page.load(backItem)
         try await awaitNavigation(events, target: backItem.url.absoluteString)
-        let title = await resolveTitle()
-        return (title, page.url?.absoluteString ?? "")
+        return page.url?.absoluteString ?? ""
     }
 
-    func goForward() async throws -> (title: String?, url: String) {
+    func goForward() async throws -> String {
         let list = page.backForwardList
         guard let forwardItem = list.forwardList.first else {
             throw PeriscopeError.navigationFailed(
@@ -48,16 +46,14 @@ final class BrowserEngine {
         windowController.responseRecorder.reset()
         let events = page.load(forwardItem)
         try await awaitNavigation(events, target: forwardItem.url.absoluteString)
-        let title = await resolveTitle()
-        return (title, page.url?.absoluteString ?? "")
+        return page.url?.absoluteString ?? ""
     }
 
-    func reload() async throws -> (title: String?, url: String) {
+    func reload() async throws -> String {
         windowController.responseRecorder.reset()
         let events = page.reload()
         try await awaitNavigation(events, target: page.url?.absoluteString ?? "")
-        let title = await resolveTitle()
-        return (title, page.url?.absoluteString ?? "")
+        return page.url?.absoluteString ?? ""
     }
 
     var currentURL: String? { page.url?.absoluteString }
@@ -66,31 +62,39 @@ final class BrowserEngine {
     /// HTTP status of the main-frame response for the most recent navigation.
     var lastStatusCode: Int? { windowController.responseRecorder.statusCode }
 
-    /// Length of the page's visible text, whitespace-collapsed. Nine characters
-    /// of asterisks and a 404 shell both look like success without this.
-    func measureTextChars() async -> Int {
-        let js = "(document.body && document.body.innerText || '').replace(/\\s+/g, ' ').trim().length"
-        return (try? await runJavaScript(js) as? Int) ?? 0
+    struct PageObservation {
+        var title: String?
+        var textChars: Int
+        var blocked: BlockKind?
     }
 
-    /// Is the current page a bot challenge rather than content?
-    func detectBlock() async throws -> BlockKind? {
-        guard let json = try await runJavaScript(BlockDetector.probeScript) as? String,
-              let data = json.data(using: .utf8),
-              let probe = try? JSONDecoder().decode(BlockDetector.Probe.self, from: data) else {
-            return nil
+    private struct PageProbe: Decodable {
+        var url: String
+        var title: String
+        var textChars: Int
+        var blockText: String
+    }
+
+    /// One look at the settled page — title, visible-text length, and whether it
+    /// is a bot challenge — in a single round trip. Title, text and block markers
+    /// are three facets of the same page, so reading them separately was three
+    /// awaits to the web content process where one does.
+    func observePage() async throws -> PageObservation {
+        let script = """
+        JSON.stringify({
+            url: location.href,
+            title: document.title || '',
+            textChars: (document.body && document.body.innerText || '').replace(/\\s+/g, ' ').trim().length,
+            blockText: (document.body && document.body.innerText || '').slice(0, 4000)
+        })
+        """
+        guard let probe: PageProbe = try await runJavaScriptDecoded(script) else {
+            return PageObservation(title: nil, textChars: 0, blocked: nil)
         }
-        return BlockDetector.classify(url: probe.url, title: probe.title, text: probe.text)
-    }
-
-    /// Resolve the page title, using JS as fallback since the observable
-    /// `page.title` may not have updated yet after navigation completes.
-    func resolveTitle() async -> String? {
-        if !page.title.isEmpty { return page.title }
-        // page.title hasn't propagated yet — get it from the DOM directly
-        let jsTitle = try? await runJavaScript("document.title") as? String
-        if let jsTitle, !jsTitle.isEmpty { return jsTitle }
-        return nil
+        return PageObservation(
+            title: probe.title.isEmpty ? nil : probe.title,
+            textChars: probe.textChars,
+            blocked: BlockDetector.classify(url: probe.url, title: probe.title, text: probe.blockText))
     }
 
     // MARK: - Navigation Event Handling
@@ -176,6 +180,15 @@ final class BrowserEngine {
         _ = try await page.callJavaScript(script)
     }
 
+    /// Run a script that returns a JSON string and decode it, or nil on any
+    /// failure (not a string, bad UTF-8, or a decode mismatch). One place for the
+    /// `run → String → data → decode` ladder every diagnostics reader used.
+    func runJavaScriptDecoded<T: Decodable>(_ script: String) async throws -> T? {
+        guard let json = try await runJavaScript(script) as? String,
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
     // MARK: - History
 
     func getHistory() async throws -> [HistoryItem] {
@@ -208,10 +221,6 @@ final class BrowserEngine {
         }
     }
 
-    func installFetchMonitor() async throws {
-        try await runJavaScriptVoid(FetchQuietMonitor.installScript)
-    }
-
     func waitFor(_ strategy: WaitStrategy) async throws {
         switch strategy {
         case .load:
@@ -219,7 +228,7 @@ final class BrowserEngine {
         case .none:
             return
         case .fetchquiet(let maxMs):
-            try await installFetchMonitor()
+            // The monitor is injected at document start; no per-wait install.
             let deadline = maxMs.map { Date().addingTimeInterval(Double($0) / 1000) }
             func expired() -> Bool { deadline.map { Date() >= $0 } ?? false }
             while !expired() {
@@ -257,9 +266,8 @@ final class BrowserEngine {
         let deadline = Date().addingTimeInterval(Double(ElementResolver.actionabilityWaitMs) / 1000)
         var last = ElementProbe(count: 0, actionable: false, reason: nil, candidates: [])
         while true {
-            if let json = try await runJavaScript(ElementResolver.probeScript(selector: selector)) as? String,
-               let data = json.data(using: .utf8),
-               let probe = try? JSONDecoder().decode(ElementProbe.self, from: data) {
+            if let probe: ElementProbe = try await runJavaScriptDecoded(
+                ElementResolver.probeScript(selector: selector)) {
                 last = probe
             }
             if last.count > 0 {
@@ -326,9 +334,8 @@ final class BrowserEngine {
         if let url = currentURL {
             items.append(RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil, error: nil))
         }
-        if let json = try await runJavaScript(FetchQuietMonitor.readRequestsScript) as? String,
-           let data = json.data(using: .utf8),
-           let recorded = try? JSONDecoder().decode([RecordedRequest].self, from: data) {
+        if let recorded: [RecordedRequest] = try await runJavaScriptDecoded(
+            FetchQuietMonitor.readRequestsScript) {
             items += recorded.map {
                 RequestItem(method: $0.method, url: $0.url, status: $0.status,
                             kind: $0.kind, durationMs: $0.ms, error: $0.error)
@@ -338,12 +345,7 @@ final class BrowserEngine {
     }
 
     func consoleMessages() async throws -> [ConsoleItem] {
-        guard let json = try await runJavaScript(ConsoleMonitor.readScript) as? String,
-              let data = json.data(using: .utf8),
-              let items = try? JSONDecoder().decode([ConsoleItem].self, from: data) else {
-            return []
-        }
-        return items
+        try await runJavaScriptDecoded(ConsoleMonitor.readScript) ?? []
     }
 
     func showWindow() {

@@ -15,7 +15,7 @@ final class HiddenWindowController {
         // Installed before any page script runs, so requests fired during
         // parsing are counted by `fetchquiet` and logged for `requests`, and
         // console output from the first script onward is kept for `console`.
-        for source in [FetchQuietMonitor.installScript, ConsoleMonitor.installScript] {
+        for source in [ElementResolver.installScript, FetchQuietMonitor.installScript, ConsoleMonitor.installScript] {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }

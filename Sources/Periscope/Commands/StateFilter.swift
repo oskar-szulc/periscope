@@ -11,13 +11,11 @@ enum StateFilter {
     static func apply(_ state: PageStateData, match: String?, limit: Int?) throws -> PageStateData {
         var out = state
         if let match {
-            guard let regex = try? NSRegularExpression(pattern: match) else {
-                throw PeriscopeError.argumentError(reason: "Invalid --match regex: \(match)")
-            }
+            let matches = try RegexFilter.matcher(match)
             out.elements = state.elements.filter { element in
                 [element.selector, element.label, element.text, element.href, element.tag]
                     .compactMap { $0 }
-                    .contains { regex.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
+                    .contains { matches($0) }
             }
         }
         if let limit, out.elements.count > limit {
