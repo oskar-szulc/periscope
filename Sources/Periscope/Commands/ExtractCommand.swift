@@ -47,10 +47,15 @@ struct Attr: ParsableCommand {
 struct Links: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List all links on the page")
     @OptionGroup var globals: GlobalOptions
+    @Option(name: .long, help: "Keep only links whose URL matches this regex")
+    var match: String?
 
     func run() throws {
+        let match = match
         CommandRunner.run(globals: globals) { engine in
-            .links(try await engine.extractLinks())
+            var links = try await engine.extractLinks()
+            if let match { links = try LinkFilter.apply(pattern: match, to: links) }
+            return .links(links)
         }
     }
 }

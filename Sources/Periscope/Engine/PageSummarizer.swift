@@ -181,4 +181,7 @@ struct PageStateData: Sendable, Codable {
     var truncated: Bool
     var elements: [PageStateElement]
     var headings: [PageStateHeading]
+    /// Set by the `state` command, not by the DOM script: a challenge page
+    /// still has a URL, a title and text, and an agent must not act on them.
+    var blocked: String? = nil
 }

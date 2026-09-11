@@ -19,7 +19,7 @@ struct GlobalOptions: ParsableArguments {
     @Option(name: .long, help: "Override user agent")
     var userAgent: String?
 
-    @Option(name: .long, help: "Wait strategy: load, fetchquiet, selector:<css>, time:<ms>")
+    @Option(name: .long, help: "Wait strategy: none, load, fetchquiet, fetchquiet:<maxMs>, selector:<css>, time:<ms>")
     var wait: String?
 
     @Flag(name: .long, help: "Print navigation events to stderr")
@@ -32,6 +32,16 @@ struct GlobalOptions: ParsableArguments {
     var noDaemon: Bool = false
 
     var viewportSize: (width: Int, height: Int) { parseViewport(viewport) }
+
+    /// A misspelt `--wait` used to fall back silently; now it is an error, since
+    /// "waited the wrong way" is indistinguishable from "page is empty".
+    func waitStrategy(default fallback: WaitStrategy) throws -> WaitStrategy {
+        guard let wait else { return fallback }
+        guard let parsed = WaitStrategy.parse(wait) else {
+            throw PeriscopeError.argumentError(reason: "Unknown wait strategy: \(wait)")
+        }
+        return parsed
+    }
 }
 
 /// Shared by `GlobalOptions` and its wire payload so the default cannot drift.

@@ -26,7 +26,10 @@ struct HistoryItem: Sendable, Codable {
 }
 
 enum CommandResult: Sendable, Codable {
-    case navigate(title: String?, url: String)
+    /// `status` is the main-frame HTTP status, nil for non-HTTP loads.
+    /// `textChars` is the length of the settled page's visible text: a 404
+    /// shell or an empty SPA frame is obvious from a small number.
+    case navigate(title: String?, url: String, status: Int?, textChars: Int)
     case extract(content: String)
     case html(content: String)
     case links([LinkItem])

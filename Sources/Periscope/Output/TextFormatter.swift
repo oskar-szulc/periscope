@@ -3,8 +3,10 @@ import Foundation
 struct TextFormatter: OutputFormatting {
     func format(_ result: CommandResult) -> String {
         switch result {
-        case .navigate(let title, let url):
+        case .navigate(let title, let url, let status, let textChars):
+            let statusText = status.map(String.init) ?? "-"
             return "Navigated to: \(title ?? "(untitled)")\nURL: \(url)"
+                + "\nStatus: \(statusText) \u{00B7} Text: \(Self.grouped(textChars)) chars"
         case .extract(let content):
             return content
         case .html(let content):
@@ -47,8 +49,20 @@ struct TextFormatter: OutputFormatting {
 
     /// Laid out so an agent can read a selector off the left edge and use it
     /// verbatim in the next command.
+    /// Digit grouping independent of the user's locale, so output is greppable.
+    static func grouped(_ n: Int) -> String {
+        let digits = Array(String(n))
+        var out: [Character] = []
+        for (i, d) in digits.enumerated() {
+            if i > 0 && (digits.count - i) % 3 == 0 { out.append(",") }
+            out.append(d)
+        }
+        return String(out)
+    }
+
     private static func renderState(_ state: PageStateData) -> String {
         var lines: [String] = ["URL: \(state.url)"]
+        if let blocked = state.blocked { lines.append("Blocked: \(blocked)") }
         if !state.title.isEmpty { lines.append("Title: \(state.title)") }
 
         if !state.headings.isEmpty {

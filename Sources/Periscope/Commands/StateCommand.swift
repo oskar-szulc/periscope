@@ -31,6 +31,7 @@ struct State: ParsableCommand {
             }
 
             var state = try JSONDecoder().decode(PageStateData.self, from: data)
+            state.blocked = try await engine.detectBlock()?.rawValue
 
             if actionsOnly {
                 state.text = ""

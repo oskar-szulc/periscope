@@ -88,3 +88,30 @@ struct StateFormattingTests {
         #expect(decoded.elements.first?.href == "/x")
     }
 }
+
+@Suite("PageState blocked")
+struct StateBlockedTests {
+    @Test func blockedIsReportedRightAfterLocation() throws {
+        var state = PageStateData(
+            url: "https://www.google.com/sorry/index", title: "",
+            text: "unusual traffic", truncated: false, elements: [], headings: [])
+        state.blocked = "google-captcha"
+        let output = TextFormatter().format(.state(state))
+        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
+        #expect(lines[0] == "URL: https://www.google.com/sorry/index")
+        #expect(lines[1] == "Blocked: google-captcha")
+
+        let json = JSONFormatter().format(.state(state))
+        let object = try JSONSerialization.jsonObject(with: Data(json.utf8)) as! [String: Any]
+        let inner = object["state"] as! [String: Any]
+        #expect(inner["blocked"] as? String == "google-captcha")
+    }
+
+    @Test func unblockedStateOmitsTheLine() {
+        let state = PageStateData(
+            url: "https://example.com/", title: "Hi",
+            text: "", truncated: false, elements: [], headings: [])
+        let output = TextFormatter().format(.state(state))
+        #expect(!output.contains("Blocked:"))
+    }
+}

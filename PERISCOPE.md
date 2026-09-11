@@ -47,13 +47,29 @@ Sessions are also written to `~/.periscope/sessions/<name>/` so they survive a r
 ### Navigation
 
 ```bash
-periscope navigate <url>                 # Go to URL; prints title and final URL
+periscope navigate <url>                 # Go to URL; prints title, final URL, HTTP status, text size
 periscope back                           # Back in history
 periscope forward                        # Forward in history
 periscope reload                         # Reload current page
 periscope url                            # Print current URL
 periscope history                        # Print back/forward list
 ```
+
+Every navigation command settles the page (fetch/XHR quiet for 500ms, at most 5s) and then reports:
+
+```
+Navigated to: Page not found · GitHub
+URL: https://github.com/nope
+Status: 404 · Text: 1,017 chars
+```
+
+`Status` is the main-frame HTTP status (`-` for non-HTTP loads and for `back`/`forward` served from cache). `Text` is the length of the
+settled page's visible text. Check both before trusting `text`: a `404` shell or an SPA that
+rendered nothing reads as success otherwise. `--json` carries them as `status` and `textChars`.
+
+If the page that loaded is a bot challenge rather than content, the command **fails with exit 5**
+and code `BLOCKED`, naming the kind: `google-captcha`, `duckduckgo-challenge`, `cloudflare-challenge`.
+Clear it once with `login` (see below); the clearance cookie persists in the session.
 
 ### Orienting: `state`
 
@@ -95,6 +111,9 @@ disabled ones are marked `DISABLED`. Pages without ids get structural selectors
 
 `--json` gives the same data structured, under a `state` key.
 
+If the page is a bot challenge, a `Blocked: <kind>` line follows the URL (JSON: `blocked`). Do not
+act on the elements of a blocked page; use `login` to clear it.
+
 ### Reading the page
 
 ```bash
@@ -104,7 +123,8 @@ periscope text --raw                     # Plain text, no markdown
 periscope html                           # Full page HTML
 periscope html "<selector>"              # One element's outer HTML
 periscope attr "<selector>" <attribute>  # One attribute value, e.g. href
-periscope links                          # All links as a markdown list
+periscope links                          # All links as a markdown list (absolute URLs)
+periscope links --match "<regex>"        # Only links whose URL matches, e.g. --match 'ashbyhq\.com/[^/]+/'
 periscope table "<selector>"             # A table as markdown
 periscope elements "<selector>"          # Matching elements with tag, id, classes, text
 ```
@@ -144,16 +164,22 @@ periscope find  "<description>"          # Resolve a description to a CSS select
 
 ```bash
 periscope wait load                      # Document load
-periscope wait fetchquiet                # fetch/XHR settled (500ms quiet)
+periscope wait fetchquiet                # fetch/XHR settled (500ms quiet), no cap
+periscope wait "fetchquiet:<maxMs>"      # Same, but give up after maxMs and continue
 periscope wait "selector:<css>"          # Until an element exists
 periscope wait "time:<ms>"               # Fixed duration
 ```
 
-Most commands also take `--wait <strategy>` to wait before producing output, which saves a round trip:
+Navigation and interaction commands take `--wait <strategy>` to wait before producing output,
+which saves a round trip. Defaults: `navigate`/`back`/`forward`/`reload` use `fetchquiet:5000`;
+`click` uses `fetchquiet`. Pass `--wait none` to skip waiting entirely.
 
 ```bash
 periscope click "#load-more" --wait fetchquiet --session work
+periscope navigate "https://spa.example" --wait "selector:.job-card" --session work
 ```
+
+An unknown strategy is an argument error (exit 4), not a silent fallback.
 
 ### JavaScript
 
@@ -238,6 +264,7 @@ periscope serve                          # Run in the foreground (development)
 | 2 | Navigation failure or timeout |
 | 3 | Session error |
 | 4 | Argument error |
+| 5 | Blocked: the page is a bot challenge (Google CAPTCHA, DuckDuckGo, Cloudflare) |
 
 ## Errors
 
@@ -256,7 +283,7 @@ JSON mode puts a stable machine-readable code on stdout — branch on `code`, ne
 {"ok": false, "error": {"code": "NAVIGATION_FAILED", "message": "...", "url": "https://nope.invalid/p"}}
 ```
 
-Codes: `NAVIGATION_FAILED`, `ELEMENT_NOT_FOUND`, `MULTIPLE_ELEMENTS_FOUND`, `TIMEOUT`, `SESSION_ERROR`, `JAVASCRIPT_ERROR`, `ARGUMENT_ERROR`, `SCREENSHOT_FAILED`.
+Codes: `NAVIGATION_FAILED`, `ELEMENT_NOT_FOUND`, `MULTIPLE_ELEMENTS_FOUND`, `TIMEOUT`, `SESSION_ERROR`, `JAVASCRIPT_ERROR`, `ARGUMENT_ERROR`, `SCREENSHOT_FAILED`, `BLOCKED`.
 
 ## Patterns
 
@@ -314,4 +341,5 @@ periscope html ".container" --session s1
 - **Omitting `--session`** puts you in the shared `default` session, alongside anything else that omitted it. Name your sessions.
 - **`--no-session` across two commands does not work.** Each gets its own throwaway browser, so the second sees a blank page. Use a named session.
 - **`find` and `query` need Apple Intelligence.** They fail with an argument error where it is unavailable.
+- **`navigate` output that says `Text: 0 chars` or a small number is the signal an SPA has not rendered.** Try `--wait "selector:<css>"` for something the real content contains, or `--wait fetchquiet` without the cap.
 - **A first command in a cold session is slow** (~400ms plus page load); the rest are milliseconds. Batch work into one session rather than spreading it across many.

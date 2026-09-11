@@ -19,6 +19,7 @@ final class BrowserEngine {
     /// Navigate to a URL using the WebPage AsyncSequence navigation API.
     /// Awaits the `.finished` event instead of polling `isLoading`.
     func navigate(to url: URL) async throws -> (title: String?, url: String) {
+        windowController.responseRecorder.reset()
         let events = page.load(URLRequest(url: url))
         try await awaitNavigation(events, target: url.absoluteString)
         let title = await resolveTitle()
@@ -31,6 +32,7 @@ final class BrowserEngine {
             throw PeriscopeError.navigationFailed(
                 url: page.url?.absoluteString ?? "", reason: "No back history")
         }
+        windowController.responseRecorder.reset()
         let events = page.load(backItem)
         try await awaitNavigation(events, target: backItem.url.absoluteString)
         let title = await resolveTitle()
@@ -43,6 +45,7 @@ final class BrowserEngine {
             throw PeriscopeError.navigationFailed(
                 url: page.url?.absoluteString ?? "", reason: "No forward history")
         }
+        windowController.responseRecorder.reset()
         let events = page.load(forwardItem)
         try await awaitNavigation(events, target: forwardItem.url.absoluteString)
         let title = await resolveTitle()
@@ -50,6 +53,7 @@ final class BrowserEngine {
     }
 
     func reload() async throws -> (title: String?, url: String) {
+        windowController.responseRecorder.reset()
         let events = page.reload()
         try await awaitNavigation(events, target: page.url?.absoluteString ?? "")
         let title = await resolveTitle()
@@ -59,9 +63,29 @@ final class BrowserEngine {
     var currentURL: String? { page.url?.absoluteString }
     var currentTitle: String? { page.title.isEmpty ? nil : page.title }
 
+    /// HTTP status of the main-frame response for the most recent navigation.
+    var lastStatusCode: Int? { windowController.responseRecorder.statusCode }
+
+    /// Length of the page's visible text, whitespace-collapsed. Nine characters
+    /// of asterisks and a 404 shell both look like success without this.
+    func measureTextChars() async -> Int {
+        let js = "(document.body && document.body.innerText || '').replace(/\\s+/g, ' ').trim().length"
+        return (try? await runJavaScript(js) as? Int) ?? 0
+    }
+
+    /// Is the current page a bot challenge rather than content?
+    func detectBlock() async throws -> BlockKind? {
+        guard let json = try await runJavaScript(BlockDetector.probeScript) as? String,
+              let data = json.data(using: .utf8),
+              let probe = try? JSONDecoder().decode(BlockDetector.Probe.self, from: data) else {
+            return nil
+        }
+        return BlockDetector.classify(url: probe.url, title: probe.title, text: probe.text)
+    }
+
     /// Resolve the page title, using JS as fallback since the observable
     /// `page.title` may not have updated yet after navigation completes.
-    private func resolveTitle() async -> String? {
+    func resolveTitle() async -> String? {
         if !page.title.isEmpty { return page.title }
         // page.title hasn't propagated yet — get it from the DOM directly
         let jsTitle = try? await runJavaScript("document.title") as? String
@@ -192,10 +216,14 @@ final class BrowserEngine {
         switch strategy {
         case .load:
             try await waitForLoad()
-        case .fetchquiet:
+        case .none:
+            return
+        case .fetchquiet(let maxMs):
             try await installFetchMonitor()
-            while true {
-                while true {
+            let deadline = maxMs.map { Date().addingTimeInterval(Double($0) / 1000) }
+            func expired() -> Bool { deadline.map { Date() >= $0 } ?? false }
+            while !expired() {
+                while !expired() {
                     let quiet = try await runJavaScript(FetchQuietMonitor.checkScript) as? Bool ?? true
                     if quiet && !page.isLoading { break }
                     try await Task.sleep(for: .milliseconds(100))
@@ -382,7 +410,7 @@ final class BrowserEngine {
     func extractLinks() async throws -> [LinkItem] {
         let js = """
         Array.from(document.querySelectorAll('a[href]')).map(function(a) {
-            return { text: a.textContent.trim(), url: a.getAttribute('href') };
+            return { text: a.textContent.trim(), url: a.href };
         })
         """
         guard let results = try await runJavaScript(js) as? [[String: Any]] else {

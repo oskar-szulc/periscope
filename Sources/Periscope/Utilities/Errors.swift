@@ -9,6 +9,8 @@ enum PeriscopeError: Error, CustomStringConvertible {
     case javaScriptError(reason: String)
     case argumentError(reason: String)
     case screenshotFailed(reason: String)
+    /// The page loaded, but it is a bot challenge, not the content asked for.
+    case blocked(kind: BlockKind, url: String)
 
     var exitCode: Int32 {
         switch self {
@@ -20,6 +22,8 @@ enum PeriscopeError: Error, CustomStringConvertible {
             return 3
         case .argumentError:
             return 4
+        case .blocked:
+            return 5
         }
     }
 
@@ -43,6 +47,8 @@ enum PeriscopeError: Error, CustomStringConvertible {
             return "Argument error: \(reason)"
         case .screenshotFailed(let reason):
             return "Screenshot failed: \(reason)"
+        case .blocked(let kind, let url):
+            return "Blocked by \(kind.rawValue) at \(url)"
         }
     }
 }

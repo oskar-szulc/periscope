@@ -7,8 +7,7 @@ struct Click: ParsableCommand {
     func run() throws {
         CommandRunner.run(globals: globals) { engine in
             try await engine.click(selector: selector, strict: globals.strict)
-            let strategy = globals.wait.flatMap { WaitStrategy.parse($0) } ?? .fetchquiet
-            try await engine.waitFor(strategy)
+            try await engine.waitFor(try globals.waitStrategy(default: .fetchquiet(maxMs: nil)))
             return .plain("Clicked: \(selector)")
         }
     }

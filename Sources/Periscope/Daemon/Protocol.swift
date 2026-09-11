@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 1
+let periscopeProtocolVersion = 2
 
 enum DaemonPaths {
     /// Runtime state lives beside the sessions it serves.
@@ -102,8 +102,11 @@ struct ErrorPayload: Codable, Sendable {
 
     init(_ error: PeriscopeError) {
         self.init(code: error.wireCode, message: error.description, exitCode: error.exitCode)
-        if case .navigationFailed(let url, _) = error, !url.isEmpty {
+        switch error {
+        case .navigationFailed(let url, _) where !url.isEmpty, .blocked(_, let url):
             self.url = url
+        default:
+            break
         }
     }
 }
@@ -142,6 +145,7 @@ extension PeriscopeError {
         case .javaScriptError: return "JAVASCRIPT_ERROR"
         case .argumentError: return "ARGUMENT_ERROR"
         case .screenshotFailed: return "SCREENSHOT_FAILED"
+        case .blocked: return "BLOCKED"
         }
     }
 }

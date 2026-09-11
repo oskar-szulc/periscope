@@ -6,9 +6,19 @@ import WebKit
 final class HiddenWindowController {
     let page: WebPage
     let window: NSWindow
+    let responseRecorder = ResponseRecorder()
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
-        self.page = WebPage()
+        let configuration = WebPage.Configuration()
+        // Installed before any page script runs, so requests fired during
+        // parsing are counted by `fetchquiet` instead of slipping past it.
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: FetchQuietMonitor.installScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
+        self.page = WebPage(
+            configuration: configuration,
+            navigationDecider: NavigationObserver(recorder: responseRecorder))
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: viewportWidth, height: viewportHeight),

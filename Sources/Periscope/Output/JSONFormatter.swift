@@ -4,8 +4,9 @@ struct JSONFormatter: OutputFormatting {
     func format(_ result: CommandResult) -> String {
         let dict: [String: Any]
         switch result {
-        case .navigate(let title, let url):
-            dict = ["ok": true, "title": title as Any, "url": url]
+        case .navigate(let title, let url, let status, let textChars):
+            dict = ["ok": true, "title": title as Any, "url": url,
+                    "status": status as Any, "textChars": textChars]
         case .extract(let content):
             dict = ["ok": true, "content": content]
         case .html(let content):
