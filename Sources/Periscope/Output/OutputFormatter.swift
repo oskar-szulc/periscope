@@ -22,11 +22,14 @@ struct CookieItem: Sendable, Codable {
 struct RequestItem: Sendable, Codable {
     let method: String
     let url: String
-    /// nil while pending or if the request failed before a response.
+    /// nil while pending, or if the request failed before a response.
     let status: Int?
     /// "document", "fetch" or "xhr".
     let kind: String
     let durationMs: Int?
+    /// Set when the request failed (network error, CORS, aborted). A nil status
+    /// with an error is a failure; a nil status without one is still in flight.
+    let error: String?
 }
 
 struct ConsoleItem: Sendable, Codable {

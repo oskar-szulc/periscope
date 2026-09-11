@@ -10,10 +10,17 @@ struct Requests: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
     @Option(name: .long, help: "Keep only requests whose URL matches this regex")
     var match: String?
+    @Option(name: .long, help: "Wait up to this many ms for in-flight requests to resolve first (0 to skip)")
+    var settle: Int = 2000
+    @Flag(name: .long, help: "Show only requests that failed or are still pending")
+    var unresolved: Bool = false
 
     func run() throws {
         let match = match
+        let settle = settle
+        let unresolved = unresolved
         CommandRunner.run(globals: globals) { engine in
+            try await engine.settleRequests(maxMs: settle)
             var items = try await engine.recordedRequests()
             if let match {
                 guard let regex = try? NSRegularExpression(pattern: match) else {
@@ -23,6 +30,7 @@ struct Requests: ParsableCommand {
                     regex.firstMatch(in: $0.url, range: NSRange($0.url.startIndex..., in: $0.url)) != nil
                 }
             }
+            if unresolved { items = items.filter { $0.status == nil } }
             return .requests(items)
         }
     }

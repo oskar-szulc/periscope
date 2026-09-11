@@ -36,7 +36,8 @@ struct JSONFormatter: OutputFormatting {
         case .requests(let items):
             dict = ["ok": true, "requests": items.map {
                 ["method": $0.method, "url": $0.url, "status": $0.status as Any,
-                 "kind": $0.kind, "durationMs": $0.durationMs as Any] as [String: Any]
+                 "kind": $0.kind, "durationMs": $0.durationMs as Any,
+                 "error": $0.error as Any] as [String: Any]
             }]
         case .console(let items):
             dict = ["ok": true, "console": items.map {

@@ -40,6 +40,8 @@ enum FetchQuietMonitor {
             var meta = this.__periscope || { method: 'GET', url: '' };
             var entry = record({ method: meta.method, url: meta.url, kind: 'xhr', status: null, start: performance.now() });
             window.__periscope_inflight++;
+            this.addEventListener('error', function() { entry.error = 'network error'; });
+            this.addEventListener('abort', function() { entry.error = 'aborted'; });
             this.addEventListener('loadend', function() {
                 window.__periscope_inflight--;
                 entry.status = this.status || null; entry.ms = Math.round(performance.now() - entry.start);

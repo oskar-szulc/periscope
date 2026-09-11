@@ -39,9 +39,14 @@ struct TextFormatter: OutputFormatting {
         case .requests(let items):
             if items.isEmpty { return "No requests recorded." }
             return items.map { item in
+                let outcome: String
+                if let status = item.status { outcome = String(status) }
+                else if item.error != nil { outcome = "failed" }
+                else { outcome = "pending" }
                 var tail = item.kind
                 if let ms = item.durationMs { tail += ", \(ms)ms" }
-                return "\(item.method) \(item.url) => \(item.status.map(String.init) ?? "pending") (\(tail))"
+                if let error = item.error { tail += ": \(error)" }
+                return "\(item.method) \(item.url) => \(outcome) (\(tail))"
             }.joined(separator: "\n")
         case .console(let items):
             if items.isEmpty { return "No console messages." }

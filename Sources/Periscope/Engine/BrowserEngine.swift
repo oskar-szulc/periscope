@@ -304,19 +304,34 @@ final class BrowserEngine {
         var kind: String
         var status: Int?
         var ms: Int?
+        var error: String?
+    }
+
+    /// Let in-flight fetch/XHR resolve before a `requests` snapshot, so a request
+    /// that is about to return 200 is not reported as "pending". Bounded, because
+    /// a page with long-polling or a beacon never reaches zero in flight.
+    func settleRequests(maxMs: Int) async throws {
+        guard maxMs > 0 else { return }
+        let deadline = Date().addingTimeInterval(Double(maxMs) / 1000)
+        while Date() < deadline {
+            let inflight = try await runJavaScript("window.__periscope_inflight || 0") as? Int ?? 0
+            if inflight == 0 { return }
+            try await Task.sleep(for: .milliseconds(50))
+        }
     }
 
     /// The main document first, then everything the page's scripts fetched.
     func recordedRequests() async throws -> [RequestItem] {
         var items: [RequestItem] = []
         if let url = currentURL {
-            items.append(RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil))
+            items.append(RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil, error: nil))
         }
         if let json = try await runJavaScript(FetchQuietMonitor.readRequestsScript) as? String,
            let data = json.data(using: .utf8),
            let recorded = try? JSONDecoder().decode([RecordedRequest].self, from: data) {
             items += recorded.map {
-                RequestItem(method: $0.method, url: $0.url, status: $0.status, kind: $0.kind, durationMs: $0.ms)
+                RequestItem(method: $0.method, url: $0.url, status: $0.status,
+                            kind: $0.kind, durationMs: $0.ms, error: $0.error)
             }
         }
         return items

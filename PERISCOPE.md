@@ -144,13 +144,18 @@ actually there, including hidden nodes that `state` omits.
 ```bash
 periscope requests                       # Every fetch/XHR the page made, with status and timing
 periscope requests --match "api\."       # Only URLs matching the regex
+periscope requests --unresolved          # Only requests that failed or are still pending
+periscope requests --settle <ms>         # Wait up to <ms> for in-flight requests first (default 2000; 0 to skip)
 periscope console                        # console.* output and uncaught errors since the page loaded
 periscope console --level error          # One level only
 ```
 
 Both monitors are injected before the page's first script runs. `requests` is the fastest way to
 find the JSON endpoint behind a rendered list, and to see a 404 or 500 that the page swallowed.
-`console` is where a blank page explains itself.
+Each request reads `=> <status>` when it has returned, `=> failed` with the error when it errored
+(network failure, CORS, abort), or `=> pending` while still in flight. `requests` waits up to 2s
+for in-flight requests to settle first, so a request about to return is not shown as pending;
+pass `--settle 0` for a raw instantaneous snapshot. `console` is where a blank page explains itself.
 
 ### Interaction
 
