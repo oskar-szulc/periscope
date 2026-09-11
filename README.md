@@ -8,6 +8,7 @@ Unlike Playwright/Puppeteer which use Chromium, Periscope uses the native macOS 
 
 - macOS 26+
 - Xcode 26+ (for building)
+- Apple silicon with Apple Intelligence enabled, for `extract`, `query`, and `find` only. Every other command runs anywhere macOS 26 does.
 
 ## Build
 
@@ -21,10 +22,16 @@ The binary is at `.build/release/Periscope`.
 ## Install
 
 ```bash
+rm -f /opt/homebrew/bin/periscope
 cp .build/release/Periscope /opt/homebrew/bin/periscope
 ```
 
-Or wherever you keep local binaries that's in your PATH.
+Or wherever you keep local binaries that's on your PATH.
+
+**Reinstalling, two things that bite:**
+
+- **`rm` first, don't `cp` over the existing file.** macOS caches a binary's code signature per inode; overwriting in place makes the next launch die with exit 137. Removing then copying gives a fresh inode.
+- **Restart the daemon:** `periscope daemon stop`. A running daemon keeps serving the old binary until the wire protocol version changes; stopping it forces the next command to spawn the rebuilt one.
 
 ## Quick Start
 
@@ -39,9 +46,11 @@ periscope screenshot /tmp/page.png --session demo
 # Execute JavaScript
 periscope eval "document.title" --session demo
 
-# Fill a form
-periscope fill "#search" "query" --session demo
-periscope click "#submit" --session demo
+# Fill a form (targets can be CSS or semantic: text:/label:/placeholder:/role:)
+periscope fill "label:Search" "query" --session demo --submit
+
+# Pull structured data out as JSON (on-device model)
+periscope extract "title, price, url" --session demo
 
 # Manual login (opens visible browser window)
 periscope login "https://app.example.com/login" --session myapp
@@ -73,6 +82,12 @@ To make periscope available to agents, point them to PERISCOPE.md or add it to t
 For web browsing, use the `periscope` CLI. Reference: /path/to/periscope/PERISCOPE.md
 ```
 
+**Running under a sandbox (e.g. Claude Code):** the daemon is reached over a unix
+socket at `~/.periscope/run/sock`. If the agent's shell sandbox blocks that socket,
+every command hangs silently instead of erroring. Run periscope commands with the
+sandbox disabled for that tool. As a canary, `periscope daemon status` returns
+instantly when the socket is reachable and hangs when it is not.
+
 ## All Commands
 
 ```
@@ -82,23 +97,27 @@ reload                Reload page
 url                   Print current URL
 history               Print history
 
-state                 URL, content and every actionable selector
+state                 URL, content and every actionable selector (--match, --all, --out)
 text [selector]       Content as markdown
 html [selector]       Raw HTML
 attr <sel> <attr>     Get attribute value
-links                 List all links
+links [--match re]    List all links (absolute URLs)
 table <selector>      Extract table
+extract <fields>      Structured data as JSON via the on-device model (--from, --prompt)
 
-click <selector>      Click element
-fill <sel> <value>    Set input value
+click <target>        Click element (CSS or text:/label:/placeholder:/role:)
+fill <target> <value> Set input value (--submit to press Enter)
 select <sel> <value>  Choose <select> option
 check / uncheck       Toggle checkbox
-submit [selector]     Submit form
+submit [target]       Submit form
 scroll <target>       Scroll (up/down/top/bottom/selector)
-hover <selector>      Hover element
+hover <target>        Hover element
 
 screenshot [path]     Take screenshot
 eval <code>           Execute JavaScript
+
+requests [--match|--unresolved|--settle]   Fetch/XHR the page made, with status
+console [--level]     console.* output and uncaught errors
 
 session list/delete/export/import
 cookie list/set/delete
@@ -112,6 +131,12 @@ find <description>    Description -> CSS selector
 daemon status/stop    Inspect or stop the session daemon
 serve                 Run the daemon in the foreground
 ```
+
+Targets for interaction and `--from` accept a CSS selector or a semantic prefix
+(`text:`, `label:`, `placeholder:`, `role:<role> name=<text>`); an ambiguous target
+errors with the candidate selectors listed. Navigation and interaction print an
+HTTP status and text-size line, and fail with exit 5 (`BLOCKED`) on a bot challenge.
+See [PERISCOPE.md](PERISCOPE.md) for flags and behavior.
 
 ## License
 
