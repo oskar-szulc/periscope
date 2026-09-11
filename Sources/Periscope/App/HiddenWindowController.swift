@@ -7,15 +7,19 @@ final class HiddenWindowController {
     let page: WebPage
     let window: NSWindow
     let responseRecorder = ResponseRecorder()
+    /// The cookie jar lives here, independent of any loaded page.
+    let dataStore: WKWebsiteDataStore
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
         let configuration = WebPage.Configuration()
         // Installed before any page script runs, so requests fired during
-        // parsing are counted by `fetchquiet` instead of slipping past it.
-        configuration.userContentController.addUserScript(WKUserScript(
-            source: FetchQuietMonitor.installScript,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true))
+        // parsing are counted by `fetchquiet` and logged for `requests`, and
+        // console output from the first script onward is kept for `console`.
+        for source in [FetchQuietMonitor.installScript, ConsoleMonitor.installScript] {
+            configuration.userContentController.addUserScript(WKUserScript(
+                source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        self.dataStore = configuration.websiteDataStore
         self.page = WebPage(
             configuration: configuration,
             navigationDecider: NavigationObserver(recorder: responseRecorder))

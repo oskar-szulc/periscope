@@ -42,68 +42,9 @@ enum PageSummarizer {
             result.truncated = full.length > TEXT_LIMIT;
         }
 
-        // An element an agent cannot see is one it cannot act on.
-        function isVisible(el) {
-            var rect = el.getBoundingClientRect();
-            if (rect.width === 0 && rect.height === 0) return false;
-            var style = getComputedStyle(el);
-            return style.visibility !== 'hidden'
-                && style.display !== 'none'
-                && parseFloat(style.opacity) > 0;
-        }
-
-        function quote(value) {
-            return '"' + String(value).replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"') + '"';
-        }
-
-        function unique(sel) {
-            try { return document.querySelectorAll(sel).length === 1; }
-            catch (e) { return false; }
-        }
-
-        // Prefer a stable, readable selector; fall back to a structural path.
-        // Each candidate is checked for uniqueness before being accepted, so the
-        // selector handed back is always directly usable by click/fill.
-        function selectorFor(el) {
-            var tag = el.tagName.toLowerCase();
-
-            if (el.id && unique('#' + CSS.escape(el.id))) return '#' + CSS.escape(el.id);
-
-            var attrs = ['name', 'aria-label', 'placeholder', 'data-testid'];
-            for (var i = 0; i < attrs.length; i++) {
-                var v = el.getAttribute(attrs[i]);
-                if (v) {
-                    var s = tag + '[' + attrs[i] + '=' + quote(v) + ']';
-                    if (unique(s)) return s;
-                }
-            }
-            if (el.type) {
-                var t = tag + '[type=' + quote(el.type) + ']';
-                if (unique(t)) return t;
-            }
-
-            // Structural path, anchored at the nearest id to keep it short.
-            var parts = [], node = el;
-            while (node && node.nodeType === 1 && node !== document.body) {
-                if (node.id && unique('#' + CSS.escape(node.id))) {
-                    parts.unshift('#' + CSS.escape(node.id));
-                    break;
-                }
-                var name = node.tagName.toLowerCase();
-                var siblings = node.parentNode
-                    ? Array.prototype.filter.call(node.parentNode.children, function(c) {
-                          return c.tagName === node.tagName;
-                      })
-                    : [];
-                if (siblings.length > 1) {
-                    name += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
-                }
-                parts.unshift(name);
-                node = node.parentNode;
-            }
-            var path = parts.join(' > ');
-            return unique(path) ? path : null;
-        }
+        var P = (\(ElementResolver.preludeJS))();
+        function isVisible(el) { return P.visible(el); }
+        function selectorFor(el) { return P.selectorFor(el); }
 
         var interactive = 'a[href], button, input:not([type=hidden]), select, textarea, '
             + '[role=button], [role=link], [role=checkbox], [role=tab], [onclick], [contenteditable=true]';
@@ -184,4 +125,6 @@ struct PageStateData: Sendable, Codable {
     /// Set by the `state` command, not by the DOM script: a challenge page
     /// still has a URL, a title and text, and an agent must not act on them.
     var blocked: String? = nil
+    /// Actions cut by the default cap; nil when nothing was cut.
+    var omitted: Int? = nil
 }

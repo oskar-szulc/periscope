@@ -2,7 +2,11 @@ import Foundation
 
 enum PeriscopeError: Error, CustomStringConvertible {
     case elementNotFound(selector: String)
-    case multipleElementsFound(selector: String, count: Int)
+    /// `candidates` are one-line descriptions with a unique selector each, so
+    /// the next attempt can be exact instead of a guess.
+    case multipleElementsFound(selector: String, count: Int, candidates: [String])
+    /// Found, but hidden or disabled for the whole actionability wait.
+    case notActionable(selector: String, reason: String)
     case navigationFailed(url: String, reason: String)
     case timeout(seconds: Int)
     case sessionError(reason: String)
@@ -14,7 +18,7 @@ enum PeriscopeError: Error, CustomStringConvertible {
 
     var exitCode: Int32 {
         switch self {
-        case .elementNotFound, .multipleElementsFound, .javaScriptError, .screenshotFailed:
+        case .elementNotFound, .multipleElementsFound, .notActionable, .javaScriptError, .screenshotFailed:
             return 1
         case .navigationFailed, .timeout:
             return 2
@@ -31,8 +35,13 @@ enum PeriscopeError: Error, CustomStringConvertible {
         switch self {
         case .elementNotFound(let selector):
             return "Element not found: \(selector)"
-        case .multipleElementsFound(let selector, let count):
-            return "Selector '\(selector)' matched \(count) elements (--strict mode requires exactly 1)"
+        case .multipleElementsFound(let selector, let count, let candidates):
+            var text = "Selector '\(selector)' matched \(count) elements. Pick one, or pass --first to act on the first:"
+            for candidate in candidates { text += "\n  \(candidate)" }
+            if count > candidates.count { text += "\n  ... and \(count - candidates.count) more" }
+            return text
+        case .notActionable(let selector, let reason):
+            return "Element \(selector) is not actionable: \(reason)"
         case .navigationFailed(let url, let reason):
             return url.isEmpty
                 ? "Navigation failed: \(reason)"

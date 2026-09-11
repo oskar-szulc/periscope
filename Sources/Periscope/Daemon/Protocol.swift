@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 2
+let periscopeProtocolVersion = 3
 
 enum DaemonPaths {
     /// Runtime state lives beside the sessions it serves.
@@ -36,8 +36,10 @@ struct GlobalOptionsPayload: Codable, Sendable {
     var wait: String?
     var verbose: Bool
     var strict: Bool
+    var first: Bool = false
 
     init(_ g: GlobalOptions) {
+        first = g.first
         session = g.session
         noSession = g.noSession
         json = g.json
@@ -92,6 +94,8 @@ struct ErrorPayload: Codable, Sendable {
     var message: String
     var exitCode: Int32
     var url: String?
+    /// For MULTIPLE_ELEMENTS_FOUND: unique selectors the caller can retry with.
+    var candidates: [String]?
 
     init(code: String, message: String, exitCode: Int32, url: String? = nil) {
         self.code = code
@@ -105,6 +109,8 @@ struct ErrorPayload: Codable, Sendable {
         switch error {
         case .navigationFailed(let url, _) where !url.isEmpty, .blocked(_, let url):
             self.url = url
+        case .multipleElementsFound(_, _, let candidates):
+            self.candidates = candidates
         default:
             break
         }
@@ -139,6 +145,7 @@ extension PeriscopeError {
         switch self {
         case .elementNotFound: return "ELEMENT_NOT_FOUND"
         case .multipleElementsFound: return "MULTIPLE_ELEMENTS_FOUND"
+        case .notActionable: return "ELEMENT_NOT_ACTIONABLE"
         case .navigationFailed: return "NAVIGATION_FAILED"
         case .timeout: return "TIMEOUT"
         case .sessionError: return "SESSION_ERROR"

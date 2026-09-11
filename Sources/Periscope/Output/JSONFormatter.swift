@@ -33,6 +33,15 @@ struct JSONFormatter: OutputFormatting {
                 ["title": $0.title as Any, "url": $0.url,
                  "current": $0.isCurrent] as [String: Any]
             }]
+        case .requests(let items):
+            dict = ["ok": true, "requests": items.map {
+                ["method": $0.method, "url": $0.url, "status": $0.status as Any,
+                 "kind": $0.kind, "durationMs": $0.durationMs as Any] as [String: Any]
+            }]
+        case .console(let items):
+            dict = ["ok": true, "console": items.map {
+                ["level": $0.level, "text": $0.text, "source": $0.source as Any] as [String: Any]
+            }]
         case .state(let state):
             // Encoded through the Codable type rather than rebuilt as a
             // dictionary, so the JSON cannot drift from the struct.
@@ -61,6 +70,7 @@ struct JSONFormatter: OutputFormatting {
             "message": payload.message,
         ]
         if let url = payload.url { error["url"] = url }
+        if let candidates = payload.candidates { error["candidates"] = candidates }
 
         let dict: [String: Any] = ["ok": false, "error": error]
         guard let data = try? JSONSerialization.data(

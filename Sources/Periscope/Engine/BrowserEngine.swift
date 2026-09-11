@@ -243,14 +243,92 @@ final class BrowserEngine {
         }
     }
 
+    private struct ElementProbe: Decodable {
+        var count: Int
+        var actionable: Bool
+        var reason: String?
+        var candidates: [String]
+    }
+
+    /// Wait for the target to exist, be visible and be enabled, up to
+    /// `ElementResolver.actionabilityWaitMs`. Ambiguity fails immediately with
+    /// the candidates listed; waiting would not make two elements into one.
     func resolveElement(selector: String, strict: Bool) async throws {
-        let count = try await runJavaScript(ElementResolver.countScript(selector: selector)) as? Int ?? 0
-        if count == 0 {
-            throw PeriscopeError.elementNotFound(selector: selector)
+        let deadline = Date().addingTimeInterval(Double(ElementResolver.actionabilityWaitMs) / 1000)
+        var last = ElementProbe(count: 0, actionable: false, reason: nil, candidates: [])
+        while true {
+            if let json = try await runJavaScript(ElementResolver.probeScript(selector: selector)) as? String,
+               let data = json.data(using: .utf8),
+               let probe = try? JSONDecoder().decode(ElementProbe.self, from: data) {
+                last = probe
+            }
+            if last.count > 0 {
+                if strict && last.count > 1 {
+                    throw PeriscopeError.multipleElementsFound(
+                        selector: selector, count: last.count, candidates: last.candidates)
+                }
+                if last.actionable { return }
+            }
+            if Date() >= deadline { break }
+            try await Task.sleep(for: .milliseconds(100))
         }
-        if strict && count > 1 {
-            throw PeriscopeError.multipleElementsFound(selector: selector, count: count)
+        if last.count == 0 { throw PeriscopeError.elementNotFound(selector: selector) }
+        throw PeriscopeError.notActionable(selector: selector, reason: last.reason ?? "not visible")
+    }
+
+    func pressEnter(selector: String) async throws {
+        try await runJavaScriptVoid(ElementResolver.pressEnterScript(selector: selector))
+    }
+
+    // MARK: - Cookie jar
+
+    func allCookies() async -> [HTTPCookie] {
+        await windowController.dataStore.httpCookieStore.allCookies()
+    }
+
+    func setCookies(_ cookies: [HTTPCookie]) async {
+        for cookie in cookies {
+            await windowController.dataStore.httpCookieStore.setCookie(cookie)
         }
+    }
+
+    func deleteCookie(_ cookie: HTTPCookie) async {
+        await windowController.dataStore.httpCookieStore.deleteCookie(cookie)
+    }
+
+    // MARK: - Diagnostics
+
+    private struct RecordedRequest: Decodable {
+        var method: String
+        var url: String
+        var kind: String
+        var status: Int?
+        var ms: Int?
+    }
+
+    /// The main document first, then everything the page's scripts fetched.
+    func recordedRequests() async throws -> [RequestItem] {
+        var items: [RequestItem] = []
+        if let url = currentURL {
+            items.append(RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil))
+        }
+        if let json = try await runJavaScript(FetchQuietMonitor.readRequestsScript) as? String,
+           let data = json.data(using: .utf8),
+           let recorded = try? JSONDecoder().decode([RecordedRequest].self, from: data) {
+            items += recorded.map {
+                RequestItem(method: $0.method, url: $0.url, status: $0.status, kind: $0.kind, durationMs: $0.ms)
+            }
+        }
+        return items
+    }
+
+    func consoleMessages() async throws -> [ConsoleItem] {
+        guard let json = try await runJavaScript(ConsoleMonitor.readScript) as? String,
+              let data = json.data(using: .utf8),
+              let items = try? JSONDecoder().decode([ConsoleItem].self, from: data) else {
+            return []
+        }
+        return items
     }
 
     func showWindow() {

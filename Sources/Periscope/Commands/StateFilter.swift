@@ -1,0 +1,31 @@
+import Foundation
+
+/// Narrows a page summary to what the agent asked about.
+///
+/// `state` on a link-dense page returned 80 actions and 14k characters to answer
+/// "what is the search box's selector". The cap keeps the default answer short
+/// and says how much was left out; `match` gets straight to the one that matters.
+enum StateFilter {
+    static let defaultLimit = 25
+
+    static func apply(_ state: PageStateData, match: String?, limit: Int?) throws -> PageStateData {
+        var out = state
+        if let match {
+            guard let regex = try? NSRegularExpression(pattern: match) else {
+                throw PeriscopeError.argumentError(reason: "Invalid --match regex: \(match)")
+            }
+            out.elements = state.elements.filter { element in
+                [element.selector, element.label, element.text, element.href, element.tag]
+                    .compactMap { $0 }
+                    .contains { regex.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
+            }
+        }
+        if let limit, out.elements.count > limit {
+            out.omitted = out.elements.count - limit
+            out.elements = Array(out.elements.prefix(limit))
+        } else {
+            out.omitted = nil
+        }
+        return out
+    }
+}

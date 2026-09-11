@@ -25,11 +25,19 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "Print navigation events to stderr")
     var verbose: Bool = false
 
-    @Flag(name: .long, help: "Error if selector matches multiple elements")
-    var strict: Bool = false
+    /// Ambiguity is an error by default: acting on the first of several matches
+    /// produced wrong results with no signal. This flag opts back in.
+    @Flag(name: .long, help: "When a target matches several elements, act on the first instead of failing")
+    var first: Bool = false
+
+    /// Accepted for scripts written against the old default; it is now a no-op.
+    @Flag(name: .customLong("strict"), help: .hidden)
+    var legacyStrict: Bool = false
 
     @Flag(name: .long, help: "Run in-process instead of via the session daemon")
     var noDaemon: Bool = false
+
+    var strict: Bool { !first }
 
     var viewportSize: (width: Int, height: Int) { parseViewport(viewport) }
 

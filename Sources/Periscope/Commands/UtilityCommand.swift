@@ -4,7 +4,7 @@ import Foundation
 struct Wait: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Wait for a condition")
     @OptionGroup var globals: GlobalOptions
-    @Argument(help: "Strategy: load, fetchquiet, selector:<css>, time:<ms>") var strategy: String
+    @Argument(help: "Strategy: load, fetchquiet, fetchquiet:<maxMs>, selector:<target>, time:<ms>") var strategy: String
     func run() throws {
         guard let parsed = WaitStrategy.parse(strategy) else {
             throw PeriscopeError.argumentError(reason: "Unknown wait strategy: \(strategy)")
@@ -19,15 +19,11 @@ struct Wait: ParsableCommand {
 struct Elements: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List matching elements")
     @OptionGroup var globals: GlobalOptions
-    @Argument(help: "CSS selector") var selector: String
+    @Argument(help: ArgumentHelp(stringLiteral: targetHelp)) var selector: String
     func run() throws {
         CommandRunner.run(globals: globals) { engine in
-            let js = """
-            Array.from(document.querySelectorAll(\(ElementResolver.jsString(selector)))).map(function(el, i) {
-                return { index: i + 1, tag: el.tagName.toLowerCase(), id: el.id || null, classes: Array.from(el.classList), text: el.textContent.trim().substring(0, 80) };
-            })
-            """
-            guard let results = try await engine.runJavaScript(js) as? [[String: Any]] else {
+            guard let results = try await engine.runJavaScript(
+                ElementResolver.elementsScript(selector: selector)) as? [[String: Any]] else {
                 return .elements([])
             }
             return .elements(results.map {

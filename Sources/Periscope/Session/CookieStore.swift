@@ -8,10 +8,42 @@ struct PersistedCookie: Codable, Sendable {
     let expires: String?
     let secure: Bool
     let httpOnly: Bool
+
+    init(name: String, value: String, domain: String, path: String,
+         expires: String?, secure: Bool, httpOnly: Bool) {
+        self.name = name
+        self.value = value
+        self.domain = domain
+        self.path = path
+        self.expires = expires
+        self.secure = secure
+        self.httpOnly = httpOnly
+    }
+
+    /// Snapshot of a jar cookie with every attribute that matters on restore.
+    /// A session cookie has no expiry and is kept; the jar would have kept it too.
+    init(_ cookie: HTTPCookie) {
+        self.init(
+            name: cookie.name, value: cookie.value, domain: cookie.domain, path: cookie.path,
+            expires: cookie.expiresDate.map(CookieStore.isoFormatter.string(from:)),
+            secure: cookie.isSecure, httpOnly: cookie.isHTTPOnly)
+    }
+
+    var httpCookie: HTTPCookie? {
+        var props: [HTTPCookiePropertyKey: Any] = [
+            .name: name, .value: value, .domain: domain, .path: path,
+        ]
+        if secure { props[.secure] = "TRUE" }
+        if httpOnly { props[HTTPCookiePropertyKey("HttpOnly")] = "TRUE" }
+        if let expires, let date = CookieStore.isoFormatter.date(from: expires) {
+            props[.expires] = date
+        }
+        return HTTPCookie(properties: props)
+    }
 }
 
 enum CookieStore {
-    private nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
         return f
@@ -40,9 +72,6 @@ enum CookieStore {
 }
 
 /// Split a `document.cookie` string into name/value pairs.
-///
-/// The same split-trim-split idiom had been written out in three places
-/// (session save, `cookie list`, and login).
 func parseDocumentCookie(_ raw: String) -> [(name: String, value: String)] {
     raw.split(separator: ";").compactMap { pair in
         let parts = pair.trimmingCharacters(in: .whitespaces).split(separator: "=", maxSplits: 1)

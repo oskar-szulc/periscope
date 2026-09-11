@@ -19,6 +19,22 @@ struct CookieItem: Sendable, Codable {
     let domain: String
 }
 
+struct RequestItem: Sendable, Codable {
+    let method: String
+    let url: String
+    /// nil while pending or if the request failed before a response.
+    let status: Int?
+    /// "document", "fetch" or "xhr".
+    let kind: String
+    let durationMs: Int?
+}
+
+struct ConsoleItem: Sendable, Codable {
+    let level: String
+    let text: String
+    let source: String?
+}
+
 struct HistoryItem: Sendable, Codable {
     let title: String?
     let url: String
@@ -39,6 +55,8 @@ enum CommandResult: Sendable, Codable {
     case cookies([CookieItem])
     case sessionList([String])
     case history(items: [HistoryItem])
+    case requests([RequestItem])
+    case console([ConsoleItem])
     case state(PageStateData)
     case plain(String)
     case error(String)

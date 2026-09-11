@@ -1,6 +1,9 @@
 import ArgumentParser
 import Foundation
 
+/// Cookies live in WebKit's jar for the session's data store, not in
+/// `document.cookie`. Reading the jar shows every host and HttpOnly cookies;
+/// writing it needs no page to be loaded first.
 struct Cookie: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Manage cookies",
@@ -12,17 +15,22 @@ struct CookieSetCmd: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "Cookie name") var name: String
     @Argument(help: "Cookie value") var value: String
-    @Option(name: .long, help: "Domain") var domain: String?
+    @Option(name: .long, help: "Domain (default: current page's host)") var domain: String?
     @Option(name: .long, help: "Path") var path: String = "/"
     @Flag(name: .long, help: "Secure") var secure: Bool = false
     func run() throws {
+        let (name, value, domain, path, secure) = (name, value, domain, path, secure)
         CommandRunner.run(globals: globals) { engine in
-            var parts = ["\(name)=\(value)", "path=\(path)"]
-            if let domain { parts.append("domain=\(domain)") }
-            if secure { parts.append("secure") }
-            let cookieStr = parts.joined(separator: "; ")
-            try await engine.runJavaScriptVoid("document.cookie = \(ElementResolver.jsString(cookieStr))")
-            return .plain("Cookie set: \(name)")
+            guard let host = domain ?? engine.currentURL.flatMap({ URL(string: $0)?.host }) else {
+                throw PeriscopeError.argumentError(reason: "No page loaded; pass --domain")
+            }
+            var props: [HTTPCookiePropertyKey: Any] = [.name: name, .value: value, .domain: host, .path: path]
+            if secure { props[.secure] = "TRUE" }
+            guard let cookie = HTTPCookie(properties: props) else {
+                throw PeriscopeError.argumentError(reason: "Invalid cookie")
+            }
+            await engine.setCookies([cookie])
+            return .plain("Cookie set: \(name) for \(host)")
         }
     }
 }
@@ -31,27 +39,28 @@ struct CookieDeleteCmd: ParsableCommand {
     static let configuration = CommandConfiguration(commandName: "delete", abstract: "Delete a cookie")
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "Cookie name") var name: String
+    @Option(name: .long, help: "Only on this domain") var domain: String?
     func run() throws {
+        let (name, domain) = (name, domain)
         CommandRunner.run(globals: globals) { engine in
-            let cookieStr = "\(name)=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"
-            try await engine.runJavaScriptVoid("document.cookie = \(ElementResolver.jsString(cookieStr))")
-            return .plain("Cookie deleted: \(name)")
+            let victims = await engine.allCookies().filter {
+                $0.name == name && (domain == nil || $0.domain == domain)
+            }
+            for cookie in victims { await engine.deleteCookie(cookie) }
+            return .plain("Cookie deleted: \(name) (\(victims.count) removed)")
         }
     }
 }
 
 struct CookieListCmd: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "list", abstract: "List cookies for the current page")
+        commandName: "list", abstract: "List every cookie in the session's jar")
     @OptionGroup var globals: GlobalOptions
     func run() throws {
         CommandRunner.run(globals: globals) { engine in
-            let str = try await engine.runJavaScript("document.cookie") as? String ?? ""
-            guard !str.isEmpty else { return .cookies([]) }
-            let host = engine.currentURL.flatMap { URL(string: $0)?.host } ?? ""
-            let items = parseDocumentCookie(str).map {
-                CookieItem(name: $0.name, value: $0.value, domain: host)
-            }
+            let items = await engine.allCookies()
+                .sorted { ($0.domain, $0.name) < ($1.domain, $1.name) }
+                .map { CookieItem(name: $0.name, value: $0.value, domain: $0.domain) }
             return .cookies(items)
         }
     }

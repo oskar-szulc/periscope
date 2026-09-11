@@ -76,6 +76,9 @@ Clear it once with `login` (see below); the clearance cookie persists in the ses
 ```bash
 periscope state                          # URL, title, headings, content, and every action
 periscope state --actions-only           # Skip the content, just what is clickable
+periscope state --match "<regex>"        # Only actions whose selector, label, text or href matches
+periscope state --all                    # Every action; the default shows the first 25 and says how many more
+periscope state --out page.txt           # Full output to a file, one summary line to the terminal
 periscope state --text-limit 500         # Cap the content
 ```
 
@@ -136,20 +139,65 @@ deprecated alias for `text`.
 Use `elements` when a selector is not matching what you expected; it shows what is
 actually there, including hidden nodes that `state` omits.
 
+### Diagnostics
+
+```bash
+periscope requests                       # Every fetch/XHR the page made, with status and timing
+periscope requests --match "api\."       # Only URLs matching the regex
+periscope console                        # console.* output and uncaught errors since the page loaded
+periscope console --level error          # One level only
+```
+
+Both monitors are injected before the page's first script runs. `requests` is the fastest way to
+find the JSON endpoint behind a rendered list, and to see a 404 or 500 that the page swallowed.
+`console` is where a blank page explains itself.
+
 ### Interaction
 
 ```bash
-periscope click  "<selector>"            # Click
-periscope fill   "<selector>" "<value>"  # Set an input (fires input + change)
-periscope select "<selector>" "<value>"  # Choose a <select> option
-periscope check   "<selector>"           # Check a checkbox
-periscope uncheck "<selector>"           # Uncheck a checkbox
-periscope submit                         # Submit the first form
-periscope submit "<selector>"            # Submit a specific form
-periscope hover  "<selector>"            # Hover
+periscope click  "<target>"              # Click
+periscope fill   "<target>" "<value>"    # Set an input (fires input + change)
+periscope fill   "<target>" "<value>" --submit   # ...then press Enter, submitting its form
+periscope select "<target>" "<value>"    # Choose a <select> option
+periscope check   "<target>"             # Check a checkbox
+periscope uncheck "<target>"             # Uncheck a checkbox
+periscope submit                         # Submit the first form (runs the page's submit handlers)
+periscope submit "<target>"              # Submit a specific form, or the form containing a field
+periscope hover  "<target>"              # Hover
 periscope scroll down|up|top|bottom      # Scroll the page
-periscope scroll "<selector>"            # Scroll an element into view
+periscope scroll "<target>"              # Scroll an element into view
 ```
+
+**Targets.** A target is a CSS selector, or one of four prefixes that name an element the way a
+person sees it. Matching is case-insensitive, whitespace-collapsed, and prefers exact matches:
+
+```bash
+periscope click "text:Next"                        # visible text
+periscope fill  "label:Search Wikipedia" "WebKit"  # <label>, aria-label or title
+periscope fill  "placeholder:Email" "a@b.c"        # placeholder attribute
+periscope click "role:button name=Sign in"         # role (button, link, textbox, searchbox, checkbox,
+                                                   #   radio, combobox, heading, tab, ...) + accessible name
+```
+
+**Ambiguity is an error.** A target that matches several elements fails (exit 1, code
+`MULTIPLE_ELEMENTS_FOUND`) and lists each match with a unique selector you can use instead:
+
+```
+Error: Selector 'input[name=search]' matched 2 elements. Pick one, or pass --first to act on the first:
+  #searchInput  input[search] label="Search Wikipedia"
+  #vector-sticky-search-form input  input[search]
+```
+
+Pass `--first` to act on the first match anyway. In `--json` the list is under `error.candidates`.
+
+**Actions wait for their target.** `click`, `fill` and the rest wait up to 5s for the target to
+exist, be visible and be enabled, so a control that renders shortly after `load` is not a
+failure. After that: `Element not found` if it never appeared, or `ELEMENT_NOT_ACTIONABLE`
+with the reason (`not visible`, `disabled`).
+
+**Actions report navigations.** If a click or submit changed the URL, the output is the same
+report `navigate` prints (title, URL, status, text size), so you know where you landed without
+another call. Otherwise it is a one-line confirmation.
 
 ### Asking about the page
 
@@ -199,7 +247,7 @@ periscope screenshot --full              # Full page, not just viewport
 ### Cookies
 
 ```bash
-periscope cookie list                    # Cookies for the current page
+periscope cookie list                    # Every cookie in the session's jar, all hosts, HttpOnly included
 periscope cookie set <name> <value>      # Set a cookie
 periscope cookie set <name> <value> --domain .example.com --secure
 periscope cookie delete <name>           # Delete a cookie
@@ -252,7 +300,7 @@ periscope serve                          # Run in the foreground (development)
 | `--viewport <WxH>` | `1920x1080` | Viewport size |
 | `--user-agent <string>` | system | Override UA (raises detection risk — usually leave alone) |
 | `--wait <strategy>` | none | Wait before producing output |
-| `--strict` | off | Error if a selector matches more than one element |
+| `--first` | off | Act on the first match when a target matches several (default: error with candidates) |
 | `--verbose` | off | Navigation events on stderr |
 
 ## Exit codes
@@ -283,7 +331,7 @@ JSON mode puts a stable machine-readable code on stdout — branch on `code`, ne
 {"ok": false, "error": {"code": "NAVIGATION_FAILED", "message": "...", "url": "https://nope.invalid/p"}}
 ```
 
-Codes: `NAVIGATION_FAILED`, `ELEMENT_NOT_FOUND`, `MULTIPLE_ELEMENTS_FOUND`, `TIMEOUT`, `SESSION_ERROR`, `JAVASCRIPT_ERROR`, `ARGUMENT_ERROR`, `SCREENSHOT_FAILED`, `BLOCKED`.
+Codes: `NAVIGATION_FAILED`, `ELEMENT_NOT_FOUND`, `MULTIPLE_ELEMENTS_FOUND` (with `candidates`), `ELEMENT_NOT_ACTIONABLE`, `TIMEOUT`, `SESSION_ERROR`, `JAVASCRIPT_ERROR`, `ARGUMENT_ERROR`, `SCREENSHOT_FAILED`, `BLOCKED`.
 
 ## Patterns
 

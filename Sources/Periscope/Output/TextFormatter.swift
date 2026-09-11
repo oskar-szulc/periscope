@@ -36,6 +36,18 @@ struct TextFormatter: OutputFormatting {
             }.joined(separator: "\n")
         case .state(let state):
             return Self.renderState(state)
+        case .requests(let items):
+            if items.isEmpty { return "No requests recorded." }
+            return items.map { item in
+                var tail = item.kind
+                if let ms = item.durationMs { tail += ", \(ms)ms" }
+                return "\(item.method) \(item.url) => \(item.status.map(String.init) ?? "pending") (\(tail))"
+            }.joined(separator: "\n")
+        case .console(let items):
+            if items.isEmpty { return "No console messages." }
+            return items.map { item in
+                "[\(item.level)] \(item.text)" + (item.source.map { " (\($0))" } ?? "")
+            }.joined(separator: "\n")
         case .plain(let text):
             return text
         case .error(let message):
@@ -86,7 +98,11 @@ struct TextFormatter: OutputFormatting {
             return lines.joined(separator: "\n")
         }
 
-        lines.append("Actions (\(state.elements.count)):")
+        if let omitted = state.omitted {
+            lines.append("Actions (\(state.elements.count) of \(state.elements.count + omitted)):")
+        } else {
+            lines.append("Actions (\(state.elements.count)):")
+        }
         let width = state.elements.map(\.selector.count).max() ?? 0
         for element in state.elements {
             var descriptor = element.tag
@@ -105,6 +121,9 @@ struct TextFormatter: OutputFormatting {
                 toLength: max(width, element.selector.count), withPad: " ", startingAt: 0)
             lines.append("  \(padded)  \(descriptor)"
                 + (notes.isEmpty ? "" : "  " + notes.joined(separator: " ")))
+        }
+        if let omitted = state.omitted {
+            lines.append("  ... \(omitted) more; use --all or --match <regex>")
         }
         return lines.joined(separator: "\n")
     }
