@@ -4,8 +4,7 @@ import Foundation
 struct Extract: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "text",
-        abstract: "Extract text content as markdown",
-        aliases: ["extract"])
+        abstract: "Extract text content as markdown")
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "CSS selector (optional)") var selector: String?
     @Flag(name: .long, help: "Raw text, no markdown") var raw: Bool = false

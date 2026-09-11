@@ -133,8 +133,27 @@ periscope elements "<selector>"          # Matching elements with tag, id, class
 ```
 
 Reach for these when you want one specific thing; use `state` when you want to
-orient. `text` is the most token-efficient view of a page's prose. `extract` is a
-deprecated alias for `text`.
+orient. `text` is the most token-efficient view of a page's prose.
+
+### Structured extraction
+
+```bash
+periscope extract "title, location, apply_url"     # rows: [{title, location, apply_url}, ...]
+periscope extract "title, url" --from "#results"   # scope to a CSS subtree
+periscope extract --prompt "the pricing tiers and monthly prices"   # free-form JSON
+```
+
+`extract` turns the page into JSON using the on-device model (Apple Intelligence),
+so the agent reads data, not DOM, and the raw HTML never enters its context. A
+comma-separated field list returns one row per item on the page; `--prompt` takes a
+natural-language description and returns whatever JSON shape fits. Without `--from`
+it reads the page's main content (nav, header, footer stripped); long pages are
+chunked to the model's window and the rows merged. Output is JSON in both text and
+`--json` modes.
+
+Requires Apple Intelligence (Apple silicon, enabled). Where it is unavailable,
+`extract` prints the readable page content instead, so the agent can parse it
+in-context. Values are strings in this version.
 
 Use `elements` when a selector is not matching what you expected; it shows what is
 actually there, including hidden nodes that `state` omits.

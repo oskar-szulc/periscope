@@ -62,6 +62,9 @@ enum CommandResult: Sendable, Codable {
     case console([ConsoleItem])
     case state(PageStateData)
     case plain(String)
+    /// A string that is already JSON: printed verbatim in both text and --json
+    /// modes, so `extract` output is not wrapped or double-encoded.
+    case rawJSON(String)
     case error(String)
 }
 

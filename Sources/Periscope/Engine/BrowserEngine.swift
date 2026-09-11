@@ -446,6 +446,38 @@ final class BrowserEngine {
 
     // MARK: - Extraction
 
+    /// The page's readable text for extraction: `innerText` of the target (or
+    /// main/article/body), block boundaries kept as newlines, runs of spaces
+    /// collapsed. With no selector the page chrome (nav, header, footer, aside)
+    /// is stripped; with an explicit selector only scripts/styles are, since the
+    /// caller aimed at what they want.
+    func readableContent(from selector: String?) async throws -> String {
+        let rootExpr = selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" }
+            ?? "(document.querySelector('main') || document.querySelector('article') || document.body)"
+        let extraStrip = selector == nil ? ", nav, header, footer, aside" : ""
+        let js = """
+        (function() {
+            var root = \(rootExpr);
+            if (!root) return null;
+            var clone = root.cloneNode(true);
+            clone.querySelectorAll('script, style, noscript, iframe, svg\(extraStrip)')
+                .forEach(function(el) { el.remove(); });
+            document.body.appendChild(clone);
+            clone.style.position = 'absolute'; clone.style.left = '-99999px';
+            var text = clone.innerText || clone.textContent || '';
+            clone.remove();
+            return text.split('\\n')
+                .map(function(l) { return l.replace(/[ \\t]+/g, ' ').trim(); })
+                .filter(function(l) { return l.length; })
+                .join('\\n');
+        })()
+        """
+        guard let text = try await runJavaScript(js) as? String else {
+            throw PeriscopeError.elementNotFound(selector: selector ?? "body")
+        }
+        return text
+    }
+
     func extractText(selector: String?, raw: Bool) async throws -> String {
         let js: String
         if let selector {

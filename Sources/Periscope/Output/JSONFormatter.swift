@@ -52,6 +52,8 @@ struct JSONFormatter: OutputFormatting {
             } else {
                 dict = ["ok": false, "error": "Failed to encode page state"]
             }
+        case .rawJSON(let json):
+            return json
         case .plain(let text):
             dict = ["ok": true, "text": text]
         case .error(let message):

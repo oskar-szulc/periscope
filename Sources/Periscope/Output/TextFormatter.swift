@@ -55,6 +55,8 @@ struct TextFormatter: OutputFormatting {
             }.joined(separator: "\n")
         case .plain(let text):
             return text
+        case .rawJSON(let json):
+            return json
         case .error(let message):
             return "Error: \(message)"
         }
