@@ -88,6 +88,25 @@ every command hangs silently instead of erroring. Run periscope commands with th
 sandbox disabled for that tool. As a canary, `periscope daemon status` returns
 instantly when the socket is reachable and hangs when it is not.
 
+### Claude Code skill
+
+The repo ships a Claude Code skill in [`skill/`](skill/): a `SKILL.md` that tells the
+agent when to reach for periscope and the failure modes seen in practice, plus a
+`scripts/gsearch.sh` helper that runs a Google search (warm-up, redirect unwrapping,
+paging, block detection) end to end. Install it into your Claude config:
+
+```bash
+# Recommended: symlink, so the repo stays the source of truth and edits flow through
+ln -s "$PWD/skill" ~/.claude/skills/periscope
+
+# Or copy it in
+cp -R skill ~/.claude/skills/periscope
+```
+
+The skill's text assumes the standard install — the binary at
+`/opt/homebrew/bin/periscope` and this repo's `PERISCOPE.md` as the reference. If your
+clone lives elsewhere, update the reference path near the top of `skill/SKILL.md`.
+
 ## All Commands
 
 ```
