@@ -14,6 +14,12 @@ final class PeriscopeDaemon: @unchecked Sendable {
 
     private let registry: SessionRegistry
     private let acceptQueue = DispatchQueue(label: "periscope.daemon.accept")
+    /// Maintenance runs on its own queue, never on `acceptQueue`: the accept loop
+    /// blocks forever in `accept()`, so a timer scheduled on that serial queue
+    /// would queue behind it and never fire — which is exactly how idle eviction
+    /// and idle-exit silently stopped working (sessions lived for days).
+    private let maintenanceQueue = DispatchQueue(label: "periscope.daemon.maintenance")
+    private var maintenanceTimer: DispatchSourceTimer?
     private var listenFD: Int32 = -1
     private let idleExit: TimeInterval
     private var lastActivity = Date()
@@ -68,7 +74,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
         }
 
         acceptQueue.async { [weak self] in self?.acceptLoop() }
-        scheduleMaintenance()
+        startMaintenance()
     }
 
     private func acceptLoop() {
@@ -98,21 +104,26 @@ final class PeriscopeDaemon: @unchecked Sendable {
         return Date().timeIntervalSince(lastActivity)
     }
 
-    /// Age out idle sessions, and exit entirely once nobody is using us — a daemon
-    /// nobody needs should not stay resident.
-    private func scheduleMaintenance() {
-        acceptQueue.asyncAfter(deadline: .now() + 60) { [weak self] in
+    /// Age out idle sessions every 60s, and exit entirely once nobody is using us
+    /// — a daemon nobody needs should not stay resident. A repeating
+    /// `DispatchSourceTimer` on `maintenanceQueue` fires independently of the
+    /// blocked accept loop.
+    private func startMaintenance() {
+        let timer = DispatchSource.makeTimerSource(queue: maintenanceQueue)
+        timer.schedule(deadline: .now() + 60, repeating: 60)
+        timer.setEventHandler { [weak self] in
             guard let self else { return }
             Task {
                 await self.registry.evictIdle()
                 if self.idleSeconds() > self.idleExit, await self.registry.isEmpty {
+                    self.maintenanceTimer?.cancel()
                     await self.shutdown()
                     await MainActor.run { NSApp.terminate(nil) }
-                    return
                 }
-                self.scheduleMaintenance()
             }
         }
+        maintenanceTimer = timer
+        timer.resume()
     }
 
     func shutdown() async {
