@@ -97,7 +97,11 @@ enum DaemonClient {
         if socketExists { return true }
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: CommandLine.arguments[0])
+        // Not argv[0]: run from PATH it is the bare name "periscope", which
+        // resolves against the cwd, fails to launch, and silently leaves every
+        // command running in-process with a freshly reloaded page.
+        guard let executable = Bundle.main.executableURL else { return false }
+        process.executableURL = executable
         process.arguments = ["serve"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
