@@ -10,6 +10,14 @@ enum PageSummarizer {
     static let textLimit = 3000
     static let elementLimit = 80
 
+    /// JS expression for the page's main content root: the `<main>` with the
+    /// most text, else `<article>`, else `<body>`. Not simply the first
+    /// `<main>`: Next.js layouts can put an empty shell `<main>` ahead of the
+    /// one holding the content, and picking it yields an empty page.
+    static let mainContentExpr = """
+    (Array.from(document.querySelectorAll('main')).sort(function(a, b) { return b.textContent.length - a.textContent.length; })[0] || document.querySelector('article') || document.body)
+    """
+
     /// JavaScript that extracts a structured page summary from the DOM.
     ///
     /// Two properties matter for an agent that intends to *act* on the result:
@@ -24,7 +32,7 @@ enum PageSummarizer {
             text: '', truncated: false, elements: [], headings: []
         };
 
-        var main = document.querySelector('main') || document.querySelector('article') || document.body;
+        var main = \(mainContentExpr);
         if (main) {
             var clone = main.cloneNode(true);
             clone.querySelectorAll('script, style, nav, footer, iframe, noscript, svg')

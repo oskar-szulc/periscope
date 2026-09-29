@@ -453,7 +453,7 @@ final class BrowserEngine {
     /// caller aimed at what they want.
     func readableContent(from selector: String?) async throws -> String {
         let rootExpr = selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" }
-            ?? "(document.querySelector('main') || document.querySelector('article') || document.body)"
+            ?? PageSummarizer.mainContentExpr
         let extraStrip = selector == nil ? ", nav, header, footer, aside" : ""
         let js = """
         (function() {
@@ -490,9 +490,7 @@ final class BrowserEngine {
         } else {
             js = """
             (function() {
-                var el = document.querySelector('main')
-                      || document.querySelector('article')
-                      || document.body;
+                var el = \(PageSummarizer.mainContentExpr);
                 return el ? el.innerHTML : '';
             })();
             """
