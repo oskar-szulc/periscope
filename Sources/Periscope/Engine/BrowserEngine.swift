@@ -478,6 +478,21 @@ final class BrowserEngine {
         return text
     }
 
+    /// `extract`'s deterministic result (see `PageRecords`). When no records
+    /// turn up, the readable text rides along, so an article or a detail page
+    /// still comes back with its content.
+    func pageRecords(from: String?, items: String?) async throws -> [String: Any] {
+        guard var records = try await runJavaScript(PageRecords.script(from: from, items: items))
+                as? [String: Any] else {
+            throw PeriscopeError.elementNotFound(selector: from ?? "body")
+        }
+        if (records["items"] as? [Any])?.isEmpty ?? true {
+            if let items { throw PeriscopeError.elementNotFound(selector: items) }
+            records["text"] = String(try await readableContent(from: from).prefix(Extraction.fallbackCap))
+        }
+        return records
+    }
+
     func extractText(selector: String?, raw: Bool) async throws -> String {
         let js: String
         if let selector {

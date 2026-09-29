@@ -8,7 +8,7 @@ Unlike Playwright/Puppeteer which use Chromium, Periscope uses the native macOS 
 
 - macOS 26+
 - Xcode 26+ (for building)
-- Apple silicon with Apple Intelligence enabled, for `extract`, `query`, and `find` only. Every other command runs anywhere macOS 26 does.
+- Apple silicon with Apple Intelligence enabled, for `query`, `find`, and `extract` with fields only. Every other command runs anywhere macOS 26 does.
 
 ## Build
 
@@ -122,7 +122,7 @@ html [selector]       Raw HTML
 attr <sel> <attr>     Get attribute value
 links [--match re]    List all links (absolute URLs)
 table <selector>      Extract table
-extract <fields>      Structured data as JSON via the on-device model (--from, --prompt)
+extract [fields]      Page records as JSON (structured data, repeated items, next page); fields via the on-device model (--from, --items, --prompt)
 
 click <target>        Click element (CSS or text:/label:/placeholder:/role:)
 fill <target> <value> Set input value (--submit to press Enter)

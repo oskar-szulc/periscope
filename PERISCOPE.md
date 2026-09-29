@@ -138,22 +138,36 @@ orient. `text` is the most token-efficient view of a page's prose.
 ### Structured extraction
 
 ```bash
+periscope extract                                  # the page's own records, no model
 periscope extract "title, location, apply_url"     # rows: [{title, location, apply_url}, ...]
 periscope extract "title, url" --from "#results"   # scope to a CSS subtree
+periscope extract --items "li.result"              # name the records instead of detecting them
 periscope extract --prompt "the pricing tiers and monthly prices"   # free-form JSON
 ```
 
-`extract` turns the page into JSON using the on-device model (Apple Intelligence),
-so the agent reads data, not DOM, and the raw HTML never enters its context. A
-comma-separated field list returns one row per item on the page; `--prompt` takes a
-natural-language description and returns whatever JSON shape fits. Without `--from`
-it reads the page's main content (nav, header, footer stripped); long pages are
-chunked to the model's window and the rows merged. Output is JSON in both text and
-`--json` modes.
+With no fields, `extract` is deterministic and needs no model. It returns one JSON
+object:
 
-Requires Apple Intelligence (Apple silicon, enabled). Where it is unavailable,
-`extract` prints the readable page content instead, so the agent can parse it
-in-context. Values are strings in this version.
+- `structured`: schema.org entities from JSON-LD and microdata. Job pages carry a
+  full `JobPosting` (salary as numbers, dates, description), shops a `Product`.
+  Check this first; it is cleaner than anything scraped from the rendered page.
+- `items`: the page's repeated records (cards, results, table rows), found by
+  structure alone. Each has `text` (one entry per rendered piece of text),
+  `links`, `image`, and for table rows `fields` keyed by column header.
+- `itemSelector`: the CSS selector the items matched; pass it back as `--items`.
+- `next`: the next-page URL, when the page has one.
+- `text`: the readable content, only when no items were found.
+
+Detection skips nav, header, footer and aside. When it picks the wrong group,
+scope it with `--from` or name the records with `--items`.
+
+With fields, the on-device model (Apple Intelligence) maps those records to the
+fields and returns one row per item; `--prompt` takes a natural-language
+description and returns whatever JSON shape fits. The model reads the records, not
+the raw page, and long input is chunked with the rows merged. When the model is
+unavailable, or does not answer within two-thirds of `--timeout`, `extract` prints
+the records instead with a note on stderr. Output is JSON in both text and `--json`
+modes; model-extracted values are strings.
 
 Use `elements` when a selector is not matching what you expected; it shows what is
 actually there, including hidden nodes that `state` omits.

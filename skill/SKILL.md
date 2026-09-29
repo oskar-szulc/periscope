@@ -64,17 +64,21 @@ Every interaction accepts CSS or a semantic target: `text:Next`, `label:Search W
 
 ## Get data out, not DOM
 
-`extract` returns JSON using the on-device model, so you read fields instead of parsing HTML, and the page's raw markup never enters your context:
+`extract` returns JSON, so you read data instead of parsing HTML, and the page's raw markup never enters your context. Start with no fields: it needs no model and is deterministic.
 
 ```bash
-periscope extract "title, location, apply_url" --session s     # rows: [{...}, ...]
-periscope extract "title, url" --from "#results" --session s   # scope to a subtree
+periscope extract --session s                                  # structured, items, itemSelector, next
+periscope extract "title, location, apply_url" --session s     # rows via the on-device model
+periscope extract --items "li.result" --session s              # when detection picks the wrong group
 periscope extract --prompt "the pricing tiers and prices" --session s   # free-form JSON
 ```
 
-A comma-separated field list returns one row per item on the page; `--prompt` returns whatever JSON shape fits a description. Default scope is the readable main content (chrome stripped); long pages are chunked and merged. Reach for it instead of `text` plus hand-parsing whenever you want structured data off a rendered page.
+- `structured` holds the page's schema.org JSON-LD and microdata. Job detail pages carry a whole `JobPosting` (salary as numbers, dates, description): prefer it over anything scraped.
+- `items` are the repeated records (cards, results, table rows), found by structure: `text` pieces, `links`, `image`, and header-keyed `fields` for tables. Seen working on Indeed, GitHub search, Hacker News, Wikipedia tables, books.toscrape.
+- `next` is the pagination URL; `text` appears only when no items were found.
 
-**Model caveat.** `extract`, `query`, and `find` need Apple Intelligence. When it is missing, `extract` falls back to printing the readable content. When it is present but wedged, `respond()` can hang past the timeout (seen on this Mac) — if one of these three stalls for more than a minute, it is the model, not periscope; the page-reading commands (`text`, `state`, `eval`) are unaffected.
+Fields send those records (not the raw page) to the model. When the model is unavailable, or wedged (seen on this Mac: `respond()` never returns), `extract` gives up after two-thirds of `--timeout` and prints the records with a note on stderr, so it no longer hangs. `query` and `find` still need the model.
+
 
 ## Preflight when anything misbehaves
 

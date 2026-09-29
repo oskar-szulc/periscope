@@ -2,57 +2,89 @@ import ArgumentParser
 import Foundation
 import FoundationModels
 
-/// `extract` turns a page into structured data using the on-device model.
+/// `extract` turns a page into structured data.
 ///
-///   periscope extract "title, location, apply_url"      # rows, one per item
+///   periscope extract                                   # the page's own records, no model
+///   periscope extract "title, location, apply_url"      # rows, one per item, via the model
 ///   periscope extract --prompt "the pricing tiers and prices"   # free-form JSON
 ///   periscope extract "title, url" --from "#results"    # scope to a subtree
+///   periscope extract --items "li.result"               # name the records yourself
 ///
-/// The raw HTML never reaches the caller: the model runs locally and returns
-/// the fields, so the agent reads data, not DOM.
+/// Without fields it is deterministic (see `PageRecords`): structured data,
+/// repeated records, the next-page link. With fields, the on-device model reads
+/// those records rather than the raw page and maps them to the fields; when the
+/// model is unavailable or does not answer in time, the records come back
+/// instead. Either way the raw HTML never reaches the caller.
 struct ExtractData: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "extract",
-        abstract: "Extract structured data from the page using the on-device model")
+        abstract: "Extract structured data from the page (fields via the on-device model)")
 
     @OptionGroup var globals: GlobalOptions
 
-    @Argument(help: "Comma-separated fields (default), or a description with --prompt")
-    var query: String
+    @Argument(help: "Comma-separated fields, or a description with --prompt. Omit for the page's own records, no model")
+    var query: String?
 
     @Option(name: .long, help: "Scope extraction to this CSS selector's content")
     var from: String?
 
+    @Option(name: .long, help: "CSS selector for the records, instead of detecting them")
+    var items: String?
+
     @Flag(name: .long, help: "Treat the argument as a natural-language description; return free-form JSON")
     var prompt: Bool = false
+
+    func validate() throws {
+        if prompt && query == nil {
+            throw ValidationError("--prompt needs a description, e.g. --prompt \"the pricing tiers\"")
+        }
+    }
 
     func run() throws {
         let query = query
         let from = from
+        let items = items
         let promptMode = prompt
+        // Leave the command's own deadline room to print the fallback.
+        let modelSeconds = max(globals.timeout * 2 / 3, 5)
 
         CommandRunner.run(globals: globals) { engine in
-            let content = try await engine.readableContent(from: from)
+            let records = try await engine.pageRecords(from: from, items: items)
+            guard let query else { return .rawJSON(Self.json(records)) }
 
             guard SystemLanguageModel.default.isAvailable else {
-                // Fallback: hand back the raw content (capped) so the agent can
-                // parse it in-context. Output is plain text, not JSON, here.
                 FileHandle.standardError.write(Data(
-                    "Apple Intelligence unavailable; returning raw content instead of extracted fields.\n".utf8))
-                return .plain(String(content.prefix(Extraction.fallbackCap)))
+                    "Apple Intelligence unavailable; returning the page's records instead of extracted fields.\n".utf8))
+                return .rawJSON(Self.json(records))
             }
+            let content = PageRecords.modelInput(records)
             if content.isEmpty {
                 return .rawJSON(promptMode ? "{}" : "[]")
             }
-
-            return promptMode
-                ? try await extractFreeform(content: content, description: query)
-                : try await extractRows(content: content, fields: Extraction.fieldList(query))
+            do {
+                return try await withTimeout(seconds: modelSeconds) {
+                    promptMode
+                        ? try await Self.extractFreeform(content: content, description: query)
+                        : try await Self.extractRows(content: content, fields: Extraction.fieldList(query))
+                }
+            } catch PeriscopeError.timeout {
+                FileHandle.standardError.write(Data(
+                    "The on-device model did not answer within \(modelSeconds)s; returning the page's records instead.\n".utf8))
+                return .rawJSON(Self.json(records))
+            }
         }
     }
 
+    static func json(_ object: Any) -> String {
+        guard let data = try? JSONSerialization.data(
+                withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else {
+            return "{}"
+        }
+        return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
     /// Field list -> array of objects, one model call per chunk, rows merged.
-    private func extractRows(content: String, fields: [String]) async throws -> CommandResult {
+    private static func extractRows(content: String, fields: [String]) async throws -> CommandResult {
         guard !fields.isEmpty else {
             throw PeriscopeError.argumentError(reason: "No fields given; e.g. \"title, url\" or use --prompt")
         }
@@ -82,7 +114,7 @@ struct ExtractData: ParsableCommand {
 
     /// Natural-language description -> free-form JSON. Free JSON cannot be merged
     /// across chunks, so this uses the first chunk and warns when content spilled.
-    private func extractFreeform(content: String, description: String) async throws -> CommandResult {
+    private static func extractFreeform(content: String, description: String) async throws -> CommandResult {
         let allChunks = Extraction.chunks(content)
         let chunk = allChunks.first ?? content
         if allChunks.count > 1 {
