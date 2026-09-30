@@ -20,9 +20,18 @@ periscope install-skill    # adds the agent skill to this project
 To build from source instead (Xcode 26): `swift build -c release`, then copy
 `.build/release/periscope` onto your PATH.
 
-## What you can do
+## Reading a page
 
-- **Read:** `text`, `state` (content plus every clickable element), `extract`, `links`, `screenshot`
+| Command | Returns | Use it to |
+|---|---|---|
+| `text` | The page's main content as markdown, links included | Read an article or a post |
+| `state` | URL, title, headings, the start of the content, and every clickable element with a selector and a number (`@3`) | Decide what to click or fill next |
+| `extract` | JSON: the page's repeated items (cards, results, table rows), its structured data, and the next-page link | Scrape a list of jobs, products or results |
+| `links` | Every link on the page as an absolute URL (`--match` to filter) | Collect URLs to visit next |
+| `screenshot` | A PNG of the page as displayed | See the layout, or check visual content |
+
+## What else you can do
+
 - **Act:** `click`, `fill`, `type`, `select`, `scroll`, `mouse`, targeting CSS or what a person sees (`text:Next`, `label:Email`)
 - **Stay logged in:** named sessions persist; `login` and `show` let you take over the window
 - **Know when you're blocked:** CAPTCHA and bot-check pages exit with code 5
