@@ -20,12 +20,12 @@ enum FetchQuietMonitor {
                 return originalFetch.apply(this, arguments)
                     .then(function(r) {
                         window.__periscope_inflight--;
-                        entry.status = r.status; entry.ms = Math.round(performance.now() - entry.start);
+                        entry.status = r.status; entry.durationMs = Math.round(performance.now() - entry.start);
                         return r;
                     })
                     .catch(function(e) {
                         window.__periscope_inflight--;
-                        entry.error = String(e); entry.ms = Math.round(performance.now() - entry.start);
+                        entry.error = String(e); entry.durationMs = Math.round(performance.now() - entry.start);
                         throw e;
                     });
             };
@@ -44,7 +44,7 @@ enum FetchQuietMonitor {
                 this.addEventListener('abort', function() { entry.error = 'aborted'; });
                 this.addEventListener('loadend', function() {
                     window.__periscope_inflight--;
-                    entry.status = this.status || null; entry.ms = Math.round(performance.now() - entry.start);
+                    entry.status = this.status || null; entry.durationMs = Math.round(performance.now() - entry.start);
                 }, { once: true });
                 return originalSend.apply(this, arguments);
             };

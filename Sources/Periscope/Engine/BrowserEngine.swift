@@ -31,38 +31,31 @@ final class BrowserEngine {
     /// Navigate to a URL using the WebPage AsyncSequence navigation API.
     /// Awaits the `.finished` event instead of polling `isLoading`.
     func navigate(to url: URL) async throws -> String {
-        windowController.responseRecorder.reset()
+        windowController.navigationObserver.reset()
         let events = page.load(URLRequest(url: url))
         try await awaitNavigation(events, target: url.absoluteString)
         return page.url?.absoluteString ?? url.absoluteString
     }
 
     func goBack() async throws -> String {
-        let list = page.backForwardList
-        guard let backItem = list.backList.last else {
-            throw PeriscopeError.navigationFailed(
-                url: page.url?.absoluteString ?? "", reason: "No back history")
-        }
-        windowController.responseRecorder.reset()
-        let events = page.load(backItem)
-        try await awaitNavigation(events, target: backItem.url.absoluteString)
-        return page.url?.absoluteString ?? ""
+        try await go(to: page.backForwardList.backList.last, missing: "No back history")
     }
 
     func goForward() async throws -> String {
-        let list = page.backForwardList
-        guard let forwardItem = list.forwardList.first else {
-            throw PeriscopeError.navigationFailed(
-                url: page.url?.absoluteString ?? "", reason: "No forward history")
+        try await go(to: page.backForwardList.forwardList.first, missing: "No forward history")
+    }
+
+    private func go(to item: WebPage.BackForwardList.Item?, missing: String) async throws -> String {
+        guard let item else {
+            throw PeriscopeError.navigationFailed(url: page.url?.absoluteString ?? "", reason: missing)
         }
-        windowController.responseRecorder.reset()
-        let events = page.load(forwardItem)
-        try await awaitNavigation(events, target: forwardItem.url.absoluteString)
+        windowController.navigationObserver.reset()
+        try await awaitNavigation(page.load(item), target: item.url.absoluteString)
         return page.url?.absoluteString ?? ""
     }
 
     func reload() async throws -> String {
-        windowController.responseRecorder.reset()
+        windowController.navigationObserver.reset()
         let events = page.reload()
         try await awaitNavigation(events, target: page.url?.absoluteString ?? "")
         return page.url?.absoluteString ?? ""
@@ -78,7 +71,7 @@ final class BrowserEngine {
     }
 
     /// HTTP status of the main-frame response for the most recent navigation.
-    var lastStatusCode: Int? { windowController.responseRecorder.statusCode }
+    var lastStatusCode: Int? { windowController.navigationObserver.statusCode }
 
     struct PageObservation {
         var title: String?
@@ -180,29 +173,18 @@ final class BrowserEngine {
     /// "Could not connect to the server." becomes diagnosable.
     static func describe(_ error: any Error) -> String {
         let ns = error as NSError
-        let message = ns.localizedDescription
-        switch ns.domain {
-        case NSURLErrorDomain:
-            return "\(message) (NSURLError \(ns.code))"
-        case let domain where domain == kCFErrorDomainCFNetwork as String:
-            return "\(message) (CFNetwork \(ns.code))"
-        default:
-            return "\(message) (\(ns.domain) \(ns.code))"
-        }
+        let label = [NSURLErrorDomain: "NSURLError", kCFErrorDomainCFNetwork as String: "CFNetwork"][ns.domain] ?? ns.domain
+        return "\(ns.localizedDescription) (\(label) \(ns.code))"
     }
 
     // MARK: - JavaScript
 
-    /// Execute JavaScript on the current page.
+    /// Evaluate a JavaScript expression on the current page.
     /// WebPage.callJavaScript treats the script as a function body,
     /// so we prepend `return` to get the expression result back.
+    @discardableResult
     func runJavaScript(_ script: String) async throws -> Any? {
         try await page.callJavaScript("return \(script)")
-    }
-
-    /// Execute JavaScript without expecting a return value (side-effects only).
-    func runJavaScriptVoid(_ script: String) async throws {
-        _ = try await page.callJavaScript(script)
     }
 
     /// Run a script that returns a JSON string and decode it, or nil on any
@@ -218,39 +200,25 @@ final class BrowserEngine {
     // MARK: - History
 
     func getHistory() async throws -> [HistoryItem] {
-        var items: [HistoryItem] = []
         let list = page.backForwardList
-        for item in list.backList {
-            items.append(HistoryItem(title: item.title, url: item.url.absoluteString, isCurrent: false))
+        func row(_ item: WebPage.BackForwardList.Item, current: Bool = false) -> HistoryItem {
+            HistoryItem(title: item.title, url: item.url.absoluteString, isCurrent: current)
         }
-        if let current = list.currentItem {
-            items.append(HistoryItem(title: current.title, url: current.url.absoluteString, isCurrent: true))
-        }
-        for item in list.forwardList {
-            items.append(HistoryItem(title: item.title, url: item.url.absoluteString, isCurrent: false))
-        }
-        return items
+        return list.backList.map { row($0) } + (list.currentItem.map { [row($0, current: true)] } ?? [])
+            + list.forwardList.map { row($0) }
     }
 
     // MARK: - Wait
 
-    func waitForLoad() async throws {
-        // Use the navigations stream to wait for the current load to finish,
-        // falling back to polling if no navigation is in progress.
-        if page.isLoading {
-            for try await event in page.navigations {
-                if verbose {
-                    FileHandle.standardError.write(Data("nav: \(event)\n".utf8))
-                }
-                if event == .finished { break }
-            }
-        }
-    }
-
     func waitFor(_ strategy: WaitStrategy) async throws {
         switch strategy {
         case .load:
-            try await waitForLoad()
+            // The navigations stream ends the wait when the current load finishes.
+            guard page.isLoading else { return }
+            for try await event in page.navigations {
+                if verbose { FileHandle.standardError.write(Data("nav: \(event)\n".utf8)) }
+                if event == .finished { break }
+            }
         case .none:
             return
         case .fetchquiet(let maxMs):
@@ -346,7 +314,7 @@ final class BrowserEngine {
     /// jitter, pausing longer after spaces and punctuation.
     func type(selector: String, text: String, strict: Bool, delayMs: Int) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.focusForTypingScript(selector: selector))
+        try await runJavaScript(ElementResolver.focusForTypingScript(selector: selector))
         for character in text {
             windowController.key(character)
             guard delayMs > 0 else { continue }
@@ -356,7 +324,7 @@ final class BrowserEngine {
     }
 
     func pressEnter(selector: String) async throws {
-        try await runJavaScriptVoid(ElementResolver.pressEnterScript(selector: selector))
+        try await runJavaScript(ElementResolver.pressEnterScript(selector: selector))
     }
 
     // MARK: - Cookie jar
@@ -376,15 +344,6 @@ final class BrowserEngine {
     }
 
     // MARK: - Diagnostics
-
-    private struct RecordedRequest: Decodable {
-        var method: String
-        var url: String
-        var kind: String
-        var status: Int?
-        var ms: Int?
-        var error: String?
-    }
 
     /// Let in-flight fetch/XHR resolve before a `requests` snapshot, so a request
     /// that is about to return 200 is not reported as "pending". Bounded, because
@@ -406,15 +365,8 @@ final class BrowserEngine {
             items.append(
                 RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil, error: nil))
         }
-        if let recorded: [RecordedRequest] = try await runJavaScriptDecoded(
-            FetchQuietMonitor.readRequestsScript)
-        {
-            items += recorded.map {
-                RequestItem(
-                    method: $0.method, url: $0.url, status: $0.status,
-                    kind: $0.kind, durationMs: $0.ms, error: $0.error)
-            }
-        }
+        let recorded: [RequestItem]? = try await runJavaScriptDecoded(FetchQuietMonitor.readRequestsScript)
+        items += recorded ?? []
         return items
     }
 
@@ -448,12 +400,9 @@ final class BrowserEngine {
                     : false
                 if until.holds(url: page.url?.absoluteString ?? "", title: page.title, matches: matches) { break }
             } else {
-                if let currentURL = page.url {
-                    let currentPath = currentURL.path
-                    if currentPath != initialPath && !page.isLoading {
-                        try await Task.sleep(for: .milliseconds(1000))
-                        break
-                    }
+                if let path = page.url?.path, path != initialPath, !page.isLoading {
+                    try await Task.sleep(for: .seconds(1))
+                    break
                 }
             }
             try await Task.sleep(for: .milliseconds(500))
@@ -500,39 +449,39 @@ final class BrowserEngine {
 
     func click(selector: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.clickScript(selector: selector))
+        try await runJavaScript(ElementResolver.clickScript(selector: selector))
     }
 
     func fill(selector: String, value: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.fillScript(selector: selector, value: value))
+        try await runJavaScript(ElementResolver.fillScript(selector: selector, value: value))
     }
 
     func selectOption(selector: String, value: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.selectScript(selector: selector, value: value))
+        try await runJavaScript(ElementResolver.selectScript(selector: selector, value: value))
     }
 
     func setChecked(selector: String, checked: Bool, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.checkScript(selector: selector, checked: checked))
+        try await runJavaScript(ElementResolver.checkScript(selector: selector, checked: checked))
     }
 
     func submit(selector: String?) async throws {
         if let selector { try await resolveElement(selector: selector, strict: false) }
-        try await runJavaScriptVoid(ElementResolver.submitScript(selector: selector))
+        try await runJavaScript(ElementResolver.submitScript(selector: selector))
     }
 
     func scroll(target: String) async throws {
         if !["up", "down", "top", "bottom"].contains(target) {
             try await resolveElement(selector: target, strict: false)
         }
-        try await runJavaScriptVoid(ElementResolver.scrollScript(target: target))
+        try await runJavaScript(ElementResolver.scrollScript(target: target))
     }
 
     func hover(selector: String, strict: Bool) async throws {
         try await resolveElement(selector: selector, strict: strict)
-        try await runJavaScriptVoid(ElementResolver.hoverScript(selector: selector))
+        try await runJavaScript(ElementResolver.hoverScript(selector: selector))
     }
 
     // MARK: - Extraction
@@ -551,13 +500,7 @@ final class BrowserEngine {
             (function() {
                 var root = \(rootExpr);
                 if (!root) return null;
-                var clone = root.cloneNode(true);
-                clone.querySelectorAll('script, style, noscript, iframe, svg\(extraStrip)')
-                    .forEach(function(el) { el.remove(); });
-                document.body.appendChild(clone);
-                clone.style.position = 'absolute'; clone.style.left = '-99999px';
-                var text = clone.innerText || clone.textContent || '';
-                clone.remove();
+                var text = window.__periscope.renderedText(root, 'script, style, noscript, iframe, svg\(extraStrip)');
                 return text.split('\\n')
                     .map(function(l) { return l.replace(/[ \\t]+/g, ' ').trim(); })
                     .filter(function(l) { return l.length; })
@@ -592,9 +535,7 @@ final class BrowserEngine {
     func extractText(selector: String?, raw: Bool, links: Bool = true, images: Bool = false) async throws -> String {
         let js: String
         if raw {
-            let root =
-                selector.map { "window.__periscope.query(\(ElementResolver.jsString($0)))[0]" } ?? PageSummarizer.mainContentExpr
-            js = "(function() { var el = \(root); return el ? el.innerText : null; })()"
+            js = "(function() { var el = \(PageSummarizer.rootExpr(selector)); return el ? el.innerText : null; })()"
         } else {
             js = PageMarkdown.script(selector: selector, links: links, images: images)
         }
@@ -661,13 +602,9 @@ final class BrowserEngine {
         guard let rows = try await runJavaScript(js) as? [[String]] else {
             throw PeriscopeError.elementNotFound(selector: selector)
         }
-        guard !rows.isEmpty else { return "" }
-        var lines: [String] = []
-        lines.append("| " + rows[0].joined(separator: " | ") + " |")
-        lines.append("| " + rows[0].map { _ in "---" }.joined(separator: " | ") + " |")
-        for row in rows.dropFirst() {
-            lines.append("| " + row.joined(separator: " | ") + " |")
-        }
-        return lines.joined(separator: "\n")
+        guard let head = rows.first else { return "" }
+        return ([head, head.map { _ in "---" }] + rows.dropFirst())
+            .map { "| " + $0.joined(separator: " | ") + " |" }
+            .joined(separator: "\n")
     }
 }

@@ -6,7 +6,7 @@ import WebKit
 final class HiddenWindowController {
     let page: WebPage
     let window: NSWindow
-    let responseRecorder = ResponseRecorder()
+    let navigationObserver = NavigationObserver()
     /// The cookie jar lives here, independent of any loaded page.
     let dataStore: WKWebsiteDataStore
     private let contentController: WKUserContentController
@@ -47,7 +47,7 @@ final class HiddenWindowController {
         self.viewport = NSSize(width: viewportWidth, height: viewportHeight)
         self.page = WebPage(
             configuration: configuration,
-            navigationDecider: NavigationObserver(recorder: responseRecorder))
+            navigationDecider: navigationObserver)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: viewportWidth, height: viewportHeight),

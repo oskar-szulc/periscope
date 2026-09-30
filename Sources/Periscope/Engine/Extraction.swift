@@ -92,12 +92,6 @@ enum Extraction {
 
     /// Pull the `items` array out of the model's `{"items":[...]}` JSON.
     static func itemsFromResult(_ jsonString: String) -> [Any] {
-        guard let data = jsonString.data(using: .utf8),
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let items = object["items"] as? [Any]
-        else {
-            return []
-        }
-        return items
+        (try? JSONSerialization.jsonObject(with: Data(jsonString.utf8)) as? [String: Any])?["items"] as? [Any] ?? []
     }
 }

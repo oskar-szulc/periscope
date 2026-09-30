@@ -19,18 +19,14 @@ enum ElementResolver {
     /// milliseconds after `load`; failing instantly turned those into "not found".
     static let actionabilityWaitMs = 5000
 
+    /// A JS string literal for `s`: a JSON string is one.
     static func jsString(_ s: String) -> String {
-        let escaped =
-            s
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
-        return "'\(escaped)'"
+        String(decoding: try! JSONEncoder().encode(s), as: UTF8.self)
     }
 
     /// JavaScript helpers shared by every script here and by `PageSummarizer`,
     /// so a selector printed by `state` resolves the same way `click` resolves it.
-    /// Evaluates to an object: `{ query, selectorFor, describe, visible, actionable }`.
+    /// Evaluates to an object: `{ query, selectorFor, describe, visible, actionable, norm, renderedText }`.
     static let preludeJS = """
         (function() {
             function norm(s) { return (s == null ? '' : String(s)).replace(/\\s+/g, ' ').trim().toLowerCase(); }
@@ -116,9 +112,7 @@ enum ElementResolver {
                         if (al) pairs.push({ el: e, s: norm(al) });
                         else if (e.getAttribute('title')) pairs.push({ el: e, s: norm(e.getAttribute('title')) });
                     });
-                    var found = preferExact(pairs, arg), out = [];
-                    found.forEach(function(e) { if (out.indexOf(e) === -1) out.push(e); });
-                    return out;
+                    return Array.from(new Set(preferExact(pairs, arg)));
                 }
                 if (kind === 'placeholder') {
                     return preferExact(all.filter(function(e) { return e.getAttribute('placeholder'); })
@@ -172,7 +166,19 @@ enum ElementResolver {
                 return d;
             }
 
-            return { query: query, selectorFor: selectorFor, describe: describe, visible: visible, actionable: actionable, norm: norm };
+            // The text a reader sees under `root`, with `strip` removed. innerText
+            // needs layout, so the clone is attached off-screen while it is read.
+            function renderedText(root, strip) {
+                var clone = root.cloneNode(true);
+                clone.querySelectorAll(strip).forEach(function(el) { el.remove(); });
+                clone.style.position = 'absolute'; clone.style.left = '-99999px';
+                document.body.appendChild(clone);
+                var text = clone.innerText || clone.textContent || '';
+                clone.remove();
+                return text;
+            }
+
+            return { query: query, selectorFor: selectorFor, describe: describe, visible: visible, actionable: actionable, norm: norm, renderedText: renderedText };
         })
         """
 

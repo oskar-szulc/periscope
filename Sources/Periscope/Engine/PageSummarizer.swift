@@ -19,6 +19,12 @@ enum PageSummarizer {
         (Array.from(document.querySelectorAll('main')).sort(function(a, b) { return b.textContent.length - a.textContent.length; })[0] || (document.querySelectorAll('article').length === 1 ? document.querySelector('article') : null) || document.body)
         """
 
+    /// JS expression for the element a `text` read starts from: the target's
+    /// first match, or the main content root.
+    static func rootExpr(_ selector: String?) -> String {
+        selector.map { "window.__periscope.query(\(ElementResolver.jsString($0)))[0]" } ?? mainContentExpr
+    }
+
     /// JavaScript that extracts a structured page summary from the DOM.
     ///
     /// Two properties matter for an agent that intends to *act* on the result:
@@ -33,27 +39,17 @@ enum PageSummarizer {
                 text: '', truncated: false, elements: [], headings: []
             };
 
+            var P = window.__periscope;
             var main = \(mainContentExpr);
             if (main) {
-                var clone = main.cloneNode(true);
-                clone.querySelectorAll('script, style, nav, footer, iframe, noscript, svg')
-                    .forEach(function(el) { el.remove(); });
                 // innerText, not textContent: it respects CSS, so text inside a
                 // display:none block does not show up in a summary whose element
                 // list correctly excludes that block.
-                document.body.appendChild(clone);
-                clone.style.position = 'absolute';
-                clone.style.left = '-99999px';
-                var raw = clone.innerText || clone.textContent;
-                clone.remove();
-                var full = raw.replace(/\\s+/g, ' ').trim();
+                var full = P.renderedText(main, 'script, style, nav, footer, iframe, noscript, svg')
+                    .replace(/\\s+/g, ' ').trim();
                 result.text = full.substring(0, TEXT_LIMIT);
                 result.truncated = full.length > TEXT_LIMIT;
             }
-
-            var P = window.__periscope;
-            function isVisible(el) { return P.visible(el); }
-            function selectorFor(el) { return P.selectorFor(el); }
 
             var interactive = 'a[href], button, input:not([type=hidden]), select, textarea, '
                 + '[role=button], [role=link], [role=checkbox], [role=tab], [onclick], [contenteditable=true]';
@@ -61,9 +57,9 @@ enum PageSummarizer {
 
             Array.prototype.forEach.call(document.querySelectorAll(interactive), function(el) {
                 if (result.elements.length >= ELEMENT_LIMIT) return;
-                if (!isVisible(el)) return;
+                if (!P.visible(el)) return;
 
-                var selector = selectorFor(el);
+                var selector = P.selectorFor(el);
                 if (!selector || seen[selector]) return;
                 seen[selector] = true;
 
@@ -94,7 +90,7 @@ enum PageSummarizer {
             P.actions = result.elements.map(function(e) { return e.selector; });
 
             Array.prototype.forEach.call(document.querySelectorAll('h1, h2, h3'), function(el) {
-                if (result.headings.length >= 30 || !isVisible(el)) return;
+                if (result.headings.length >= 30 || !P.visible(el)) return;
                 var text = el.textContent.replace(/\\s+/g, ' ').trim();
                 if (text) {
                     result.headings.push({ level: Number(el.tagName.substring(1)), text: text });

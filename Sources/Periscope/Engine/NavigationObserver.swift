@@ -10,7 +10,7 @@ import WebKit
 /// frame's. Server redirects are followed inside WebKit and never reach the
 /// decider, so that first response is also the final one.
 @MainActor
-final class ResponseRecorder {
+final class NavigationObserver: WebPage.NavigationDeciding {
     private(set) var statusCode: Int?
     private var recorded = false
 
@@ -19,20 +19,11 @@ final class ResponseRecorder {
         recorded = false
     }
 
-    func record(_ response: URLResponse) {
-        guard !recorded else { return }
-        recorded = true
-        statusCode = (response as? HTTPURLResponse)?.statusCode
-    }
-}
-
-struct NavigationObserver: WebPage.NavigationDeciding {
-    let recorder: ResponseRecorder
-
-    mutating func decidePolicy(
-        for response: WebPage.NavigationResponse
-    ) async -> WKNavigationResponsePolicy {
-        recorder.record(response.response)
+    func decidePolicy(for response: WebPage.NavigationResponse) async -> WKNavigationResponsePolicy {
+        if !recorded {
+            recorded = true
+            statusCode = (response.response as? HTTPURLResponse)?.statusCode
+        }
         return .allow
     }
 }

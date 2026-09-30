@@ -42,7 +42,7 @@ enum SessionRestore {
 
         if let storage = try manager.read(PersistedStorage.self, "storage.json", session: session) {
             let json = String(decoding: try JSONEncoder().encode(storage.localStorage), as: UTF8.self)
-            try await engine.runJavaScriptVoid(
+            try await engine.runJavaScript(
                 "Object.entries(\(json)).forEach(([k, v]) => localStorage.setItem(k, v))")
         }
         return nil
