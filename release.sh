@@ -35,7 +35,6 @@ class Periscope < Formula
   homepage "https://github.com/$REPO"
   url "https://github.com/$REPO/releases/download/v$VERSION/$TARBALL"
   sha256 "$SHA"
-  version "$VERSION"
   license "MIT"
 
   depends_on macos: :tahoe
