@@ -366,10 +366,10 @@ final class BrowserEngine {
         try await runJavaScriptDecoded(ConsoleMonitor.readScript) ?? []
     }
 
-    func showWindow() async {
+    func showWindow(width: Int = 390, height: Int = 844) async {
         // A person looking at the page needs its images and fonts.
         await windowController.setResourceMode(.full)
-        windowController.showWindow()
+        windowController.showWindow(width: width, height: height)
     }
 
     func hideWindow() {

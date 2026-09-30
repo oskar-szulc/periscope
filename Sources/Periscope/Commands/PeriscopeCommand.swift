@@ -15,7 +15,7 @@ struct PeriscopeRoot: ParsableCommand {
             Eval.self,
             Session.self,
             Cookie.self,
-            Login.self,
+            Login.self, Show.self, Hide.self,
             Query.self, Find.self,
             Wait.self, Elements.self, State.self,
             Requests.self, Console.self,

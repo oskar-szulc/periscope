@@ -11,6 +11,9 @@ final class HiddenWindowController {
     let dataStore: WKWebsiteDataStore
     private let contentController: WKUserContentController
     private var resourceMode = ResourceMode.full
+    /// The page's layout size, restored when a shown window is hidden again so
+    /// a preview does not change what later commands read.
+    private var viewport: NSSize
     private var screenObserver: NSObjectProtocol?
 
     /// What real Safari appends to WebKit's user agent. An embedder gets
@@ -38,6 +41,7 @@ final class HiddenWindowController {
         }
         self.dataStore = configuration.websiteDataStore
         self.contentController = configuration.userContentController
+        self.viewport = NSSize(width: viewportWidth, height: viewportHeight)
         self.page = WebPage(
             configuration: configuration,
             navigationDecider: NavigationObserver(recorder: responseRecorder))
@@ -85,7 +89,8 @@ final class HiddenWindowController {
     }
 
     func resize(width: Int, height: Int) {
-        window.setContentSize(NSSize(width: width, height: height))
+        viewport = NSSize(width: width, height: height)
+        window.setContentSize(viewport)
     }
 
     func showWindow(width: Int = 390, height: Int = 844) {
@@ -106,6 +111,7 @@ final class HiddenWindowController {
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.stationary, .canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
         window.styleMask = [.borderless]
+        window.setContentSize(viewport)
         park()
     }
 

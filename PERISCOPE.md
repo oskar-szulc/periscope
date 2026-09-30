@@ -319,6 +319,13 @@ Opens a **visible** window so a person can log in by hand, then saves cookies an
 
 It waits 120 seconds by default; `--timeout 600` gives ten minutes and `--timeout 0` waits until Ctrl-C. On timeout it says which condition never held and where the page was.
 
+To hand over a page that is already open (a CAPTCHA or MFA prompt mid-task), show that session's window and take it back afterwards:
+
+```bash
+periscope show --session myapp        # 1280x800 window over the live page (--size WxH)
+periscope hide --session myapp        # back to hidden, viewport restored
+```
+
 After this, the session is authenticated and normal commands work:
 
 ```bash
