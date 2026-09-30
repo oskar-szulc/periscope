@@ -594,6 +594,21 @@ periscope serve                          # Run in the foreground (development)
 | `--first` | off | Act on the first match when a target matches several (default: error with candidates) |
 | `--verbose` | off | Navigation events on stderr |
 
+## MCP server
+
+`periscope mcp` serves the main commands as MCP tools over stdio, for agents that speak MCP
+rather than a shell: `navigate`, `state`, `text`, `extract`, `links`, `screenshot` (an
+image), `click`, `fill`, `type`, `scroll`, `eval`. Each takes an optional `session`
+(default `mcp`) and behaves exactly like the command, since it runs it. It speaks both the
+2026-07-28 protocol and the earlier `initialize`-based ones.
+
+```bash
+claude mcp add periscope -- periscope mcp
+```
+
+Other clients take the same command in their config:
+`{"mcpServers": {"periscope": {"command": "periscope", "args": ["mcp"]}}}`.
+
 ## Where state lives
 
 Sessions and the daemon's socket live in `~/.periscope`. Set `PERISCOPE_DIR` to keep a

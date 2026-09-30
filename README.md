@@ -26,6 +26,7 @@ To build from source instead (Xcode 26): `swift build -c release`, then copy
 
 - **Claude Code:** `/plugin marketplace add oskar-szulc/periscope`, then `/plugin install periscope@periscope`
 - **Codex, Cursor and others:** `npx skills add oskar-szulc/periscope`
+- **MCP clients:** the command is `periscope mcp`, e.g. `claude mcp add periscope -- periscope mcp`, or in a JSON config: `{"mcpServers": {"periscope": {"command": "periscope", "args": ["mcp"]}}}`
 - **Any agent with a shell:** `periscope docs` prints the full reference
 
 ## Reading a page

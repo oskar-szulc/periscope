@@ -24,7 +24,7 @@ struct PeriscopeRoot: ParsableCommand {
             Query.self, Find.self,
             Wait.self, Elements.self, State.self,
             Requests.self, Console.self,
-            Serve.self, DaemonGroup.self, InstallSkill.self, Docs.self,
+            Serve.self, DaemonGroup.self, InstallSkill.self, Docs.self, MCP.self,
         ]
     )
 }
