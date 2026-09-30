@@ -16,8 +16,11 @@ struct GlobalOptions: ParsableArguments {
     @Option(name: .long, help: "Viewport size (WxH)")
     var viewport: String = "1920x1080"
 
-    @Option(name: .long, help: "Override user agent")
+    @Option(name: .long, help: "Override user agent; sticks for a live session")
     var userAgent: String?
+
+    @Option(name: .long, help: "lean skips images, media and fonts for faster loads; full restores them. Sticks for a live session")
+    var resourceMode: ResourceMode?
 
     @Option(name: .long, help: "Wait strategy: none, load, fetchquiet, fetchquiet:<maxMs>, selector:<css>, time:<ms>")
     var wait: String?

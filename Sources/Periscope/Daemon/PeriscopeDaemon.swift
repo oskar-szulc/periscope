@@ -204,7 +204,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
         let response: Response
         do {
             let result = try await withTimeout(seconds: options.timeout) {
-                try await session.run(verbose: options.verbose, userAgent: options.userAgent, block)
+                try await session.run(verbose: options.verbose, block)
             }
             response = .ok(result, warnings: warnings + (await session.drainWarnings()))
         } catch let error as PeriscopeError {

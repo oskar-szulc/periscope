@@ -26,7 +26,16 @@ enum CommandRunner {
         return URL(fileURLWithPath: path, relativeTo: URL(fileURLWithPath: base)).path
     }
 
-    static func run(globals: GlobalOptions, command: @escaping CommandBlock) {
+    static func run(globals: GlobalOptions, command original: @escaping CommandBlock) {
+        // Browser settings a command asks for (--user-agent, --resource-mode)
+        // apply here, on both paths: the daemon re-parses argv, so its copy of
+        // `globals` is the client's.
+        let (userAgent, resourceMode) = (globals.userAgent, globals.resourceMode)
+        let command: CommandBlock = { engine in
+            await engine.configure(userAgent: userAgent, resourceMode: resourceMode)
+            return try await original(engine)
+        }
+
         // Inside the daemon: hand the block over instead of running it.
         if let execution = daemonExecution {
             execution.block = command
@@ -72,7 +81,6 @@ enum CommandRunner {
                 let engine = await MainActor.run {
                     let e = BrowserEngine(viewportWidth: width, viewportHeight: height)
                     e.verbose = globals.verbose
-                    e.setUserAgent(globals.userAgent)
                     return e
                 }
 

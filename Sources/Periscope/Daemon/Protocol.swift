@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 4
+let periscopeProtocolVersion = 5
 
 enum DaemonPaths {
     /// Runtime state lives beside the sessions it serves.
@@ -32,7 +32,6 @@ struct GlobalOptionsPayload: Codable, Sendable {
     var json: Bool
     var timeout: Int
     var viewport: String
-    var userAgent: String?
     var verbose: Bool
 
     // Interaction flags (--wait, --first/--strict) are not carried here: the
@@ -44,7 +43,6 @@ struct GlobalOptionsPayload: Codable, Sendable {
         json = g.json
         timeout = g.timeout
         viewport = g.viewport
-        userAgent = g.userAgent
         verbose = g.verbose
     }
 

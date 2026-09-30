@@ -9,6 +9,8 @@ final class HiddenWindowController {
     let responseRecorder = ResponseRecorder()
     /// The cookie jar lives here, independent of any loaded page.
     let dataStore: WKWebsiteDataStore
+    private let contentController: WKUserContentController
+    private var resourceMode = ResourceMode.full
     private var screenObserver: NSObjectProtocol?
 
     /// What real Safari appends to WebKit's user agent. An embedder gets
@@ -35,6 +37,7 @@ final class HiddenWindowController {
                 source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         self.dataStore = configuration.websiteDataStore
+        self.contentController = configuration.userContentController
         self.page = WebPage(
             configuration: configuration,
             navigationDecider: NavigationObserver(recorder: responseRecorder))
@@ -72,6 +75,13 @@ final class HiddenWindowController {
     private func park() {
         guard let screen = NSScreen.screens.max(by: { $0.frame.maxX < $1.frame.maxX })?.frame else { return }
         window.setFrameOrigin(NSPoint(x: screen.maxX - 1, y: screen.minY))
+    }
+
+    /// Applies to loads from here on; the current page keeps what it has.
+    func setResourceMode(_ mode: ResourceMode) async {
+        guard mode != resourceMode, let rules = await ResourceMode.leanRuleList() else { return }
+        if mode == .lean { contentController.add(rules) } else { contentController.remove(rules) }
+        resourceMode = mode
     }
 
     func resize(width: Int, height: Int) {

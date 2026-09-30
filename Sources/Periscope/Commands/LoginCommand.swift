@@ -90,7 +90,7 @@ struct Login: ParsableCommand {
         _ = try await engine.navigate(to: parsedURL)
 
         // Show the window for manual interaction
-        engine.showWindow()
+        await engine.showWindow()
 
         // Print instructions to stderr
         FileHandle.standardError.write(

@@ -11,6 +11,12 @@ final class BrowserEngine {
     func setUserAgent(_ userAgent: String?) {
         if let userAgent { page.customUserAgent = userAgent }
     }
+
+    /// Per-command browser settings; nil leaves the current one in place.
+    func configure(userAgent: String?, resourceMode: ResourceMode?) async {
+        setUserAgent(userAgent)
+        if let resourceMode { await windowController.setResourceMode(resourceMode) }
+    }
     var verbose: Bool = false
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
@@ -360,7 +366,9 @@ final class BrowserEngine {
         try await runJavaScriptDecoded(ConsoleMonitor.readScript) ?? []
     }
 
-    func showWindow() {
+    func showWindow() async {
+        // A person looking at the page needs its images and fonts.
+        await windowController.setResourceMode(.full)
         windowController.showWindow()
     }
 

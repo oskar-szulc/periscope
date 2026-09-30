@@ -348,6 +348,7 @@ periscope serve                          # Run in the foreground (development)
 | `--timeout <seconds>` | `30` | Max wait |
 | `--viewport <WxH>` | `1920x1080` | Viewport size |
 | `--user-agent <string>` | Safari's | Override the UA; it sticks for a live session (raises detection risk — usually leave alone) |
+| `--resource-mode lean\|full` | `full` | `lean` blocks images, media and fonts: about twice as fast on image-heavy pages. Sticks for a live session; `login` switches back to `full` for the person at the window |
 | `--wait <strategy>` | none | Wait before producing output |
 | `--first` | off | Act on the first match when a target matches several (default: error with candidates) |
 | `--verbose` | off | Navigation events on stderr |

@@ -46,14 +46,11 @@ actor LiveSession {
         }
     }
 
-    func run(verbose: Bool, userAgent: String?, _ block: @escaping CommandRunner.CommandBlock) async throws -> CommandResult {
+    func run(verbose: Bool, _ block: @escaping CommandRunner.CommandBlock) async throws -> CommandResult {
         await acquire()
         defer { release() }
 
-        await MainActor.run {
-            engine.verbose = verbose
-            engine.setUserAgent(userAgent)
-        }
+        await MainActor.run { engine.verbose = verbose }
         let result: CommandResult
         do {
             result = try await block(engine)
