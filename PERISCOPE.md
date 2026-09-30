@@ -236,7 +236,11 @@ periscope fill  "label:Search Wikipedia" "WebKit"  # <label>, aria-label or titl
 periscope fill  "placeholder:Email" "a@b.c"        # placeholder attribute
 periscope click "role:button name=Sign in"         # role (button, link, textbox, searchbox, checkbox,
                                                    #   radio, combobox, heading, tab, ...) + accessible name
+periscope click @58                                # the 58th action in the last `state` output
 ```
+
+`@N` numbers come from `state` (`--match` keeps the original numbers). They live on the
+page, so they expire when it navigates: run `state` again rather than reusing an old number.
 
 **Ambiguity is an error.** A target that matches several elements fails (exit 1, code
 `MULTIPLE_ELEMENTS_FOUND`) and lists each match with a unique selector you can use instead:

@@ -17,7 +17,7 @@ enum InteractionReport {
     }
 }
 
-let targetHelp = "Target: CSS selector, or text:<visible text>, label:<label>, placeholder:<text>, role:<role> [name=<text>]"
+let targetHelp = "Target: CSS selector, or text:<visible text>, label:<label>, placeholder:<text>, role:<role> [name=<text>], or @N from the last `state`"
 
 struct Click: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Click an element")

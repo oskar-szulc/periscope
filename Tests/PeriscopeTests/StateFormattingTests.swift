@@ -33,6 +33,13 @@ struct StateFormattingTests {
         #expect(output.contains("  #submit-button  button  \"Go\""))
     }
 
+    @Test func actionsLeadWithTheirAtIndex() {
+        let output = TextFormatter().format(.state(state(elements: [
+            PageStateElement(index: 12, selector: "#go", tag: "button", text: "Go"),
+        ])))
+        #expect(output.contains("  @12  #go  button"))
+    }
+
     @Test func disabledAndCheckedAreCalledOut() {
         let output = TextFormatter().format(.state(state(elements: [
             PageStateElement(selector: "#a", tag: "button", disabled: true),

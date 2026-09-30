@@ -83,6 +83,12 @@ enum ElementResolver {
         };
 
         function query(target) {
+            var n = /^@(\\d+)$/.exec(target);
+            if (n) {
+                var actions = window.__periscope && window.__periscope.actions;
+                var sel = actions && actions[Number(n[1]) - 1];
+                return sel ? Array.prototype.slice.call(document.querySelectorAll(sel)) : [];
+            }
             var m = /^(text|label|placeholder|role):([\\s\\S]*)$/.exec(target);
             if (!m) return Array.prototype.slice.call(document.querySelectorAll(target));
             var kind = m[1], arg = m[2].trim();

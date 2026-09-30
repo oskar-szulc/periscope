@@ -126,7 +126,8 @@ struct TextFormatter: OutputFormatting {
 
             let padded = element.selector.padding(
                 toLength: max(width, element.selector.count), withPad: " ", startingAt: 0)
-            lines.append("  \(padded)  \(descriptor)"
+            let index = element.index.map { "@\($0)".padding(toLength: 4, withPad: " ", startingAt: 0) + " " } ?? ""
+            lines.append("  \(index)\(padded)  \(descriptor)"
                 + (notes.isEmpty ? "" : "  " + notes.joined(separator: " ")))
         }
         if let omitted = state.omitted {

@@ -66,7 +66,7 @@ enum PageSummarizer {
             if (!selector || seen[selector]) return;
             seen[selector] = true;
 
-            var entry = { selector: selector, tag: el.tagName.toLowerCase() };
+            var entry = { index: result.elements.length + 1, selector: selector, tag: el.tagName.toLowerCase() };
             if (el.type) entry.type = el.type;
             if (el.name) entry.name = el.name;
 
@@ -90,6 +90,10 @@ enum PageSummarizer {
             result.elements.push(entry);
         });
 
+        // `@3` in any later target means the third of these, until the page
+        // navigates (this state lives on the page, so a new document drops it).
+        P.actions = result.elements.map(function(e) { return e.selector; });
+
         Array.prototype.forEach.call(document.querySelectorAll('h1, h2, h3'), function(el) {
             if (result.headings.length >= 30 || !isVisible(el)) return;
             var text = el.textContent.replace(/\\s+/g, ' ').trim();
@@ -106,6 +110,8 @@ enum PageSummarizer {
 // MARK: - Typed view
 
 struct PageStateElement: Sendable, Codable {
+    /// 1-based; `@index` targets this element in later commands.
+    var index: Int?
     var selector: String
     var tag: String
     var type: String?
