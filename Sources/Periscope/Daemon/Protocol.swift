@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 7
+let periscopeProtocolVersion = 8
 
 enum DaemonPaths {
     /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
@@ -124,6 +124,15 @@ struct ErrorPayload: Codable, Sendable {
         self.code = code
         self.message = message
         self.exitCode = exitCode
+    }
+
+    /// A PeriscopeError keeps its code and exit code; anything else is INTERNAL.
+    init(_ error: any Error) {
+        if let error = error as? PeriscopeError {
+            self.init(error)
+        } else {
+            self.init(code: "INTERNAL", message: error.localizedDescription, exitCode: 1)
+        }
     }
 
     init(_ error: PeriscopeError) {

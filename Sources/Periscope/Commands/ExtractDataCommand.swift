@@ -41,10 +41,6 @@ struct ExtractData: ParsableCommand {
     }
 
     func run() throws {
-        let query = query
-        let from = from
-        let items = items
-        let promptMode = prompt
         // Leave the command's own deadline room to print the fallback.
         let modelSeconds = max(globals.timeout * 2 / 3, 5)
 
@@ -61,11 +57,11 @@ struct ExtractData: ParsableCommand {
             }
             let content = PageRecords.modelInput(records)
             if content.isEmpty {
-                return .rawJSON(promptMode ? "{}" : "[]")
+                return .rawJSON(prompt ? "{}" : "[]")
             }
             do {
                 return try await withTimeout(seconds: modelSeconds) {
-                    promptMode
+                    prompt
                         ? try await Self.extractFreeform(content: content, description: query)
                         : try await Self.extractRows(content: content, fields: Extraction.fieldList(query))
                 }

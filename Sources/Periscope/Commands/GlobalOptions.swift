@@ -37,10 +37,6 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "When a target matches several elements, act on the first instead of failing")
     var first: Bool = false
 
-    /// Accepted for scripts written against the old default; it is now a no-op.
-    @Flag(name: .customLong("strict"), help: .hidden)
-    var legacyStrict: Bool = false
-
     @Flag(name: .long, help: "Run in-process instead of via the session daemon")
     var noDaemon: Bool = false
 

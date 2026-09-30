@@ -25,82 +25,41 @@ struct Login: ParsableCommand {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
 
-        // Capture everything as let for Sendable closure
-        let isJson = globals.json
-        let noSession = globals.noSession
-        let sessionName = globals.session
         // A person needs longer than a page load; 0 waits until Ctrl-C.
         let timeoutSeconds = globals.timeout == 30 ? 120 : globals.timeout
-        let viewportStr = globals.viewport
-        let userAgent = globals.userAgent
-        let (width, height) = globals.viewportSize
-        let urlString = url
-        let formatter = makeFormatter(json: isJson)
+        let formatter = makeFormatter(json: globals.json)
 
         MainActor.assumeIsolated {
-            AppRunner.run(json: isJson) {
+            AppRunner.run(json: globals.json) {
                 do {
-                    try await Self.executeLogin(
-                        parsedURL: parsedURL,
-                        urlString: urlString,
-                        width: width,
-                        height: height,
-                        noSession: noSession,
-                        sessionName: sessionName,
-                        timeoutSeconds: timeoutSeconds,
-                        viewportStr: viewportStr,
-                        userAgent: userAgent,
-                        untilCondition: untilCondition,
-                        formatter: formatter,
-                        isJson: isJson
-                    )
+                    try await login(parsedURL, until: untilCondition, timeoutSeconds: timeoutSeconds, formatter: formatter)
                 } catch {
-                    let msg = (error as? PeriscopeError)?.description ?? error.localizedDescription
-                    if isJson {
-                        print(formatter.format(.error(msg)))
-                    } else {
-                        FileHandle.standardError.write(Data(("Error: " + msg + "\n").utf8))
-                    }
-                    Foundation.exit((error as? PeriscopeError)?.exitCode ?? 1)
+                    let payload = ErrorPayload(error)
+                    CommandRunner.emit(payload, formatter: formatter, globals: globals)
+                    Foundation.exit(payload.exitCode)
                 }
             }
         }
     }
 
     @MainActor
-    private static func executeLogin(
-        parsedURL: URL,
-        urlString: String,
-        width: Int,
-        height: Int,
-        noSession: Bool,
-        sessionName: String,
-        timeoutSeconds: Int,
-        viewportStr: String,
-        userAgent: String?,
-        untilCondition: UntilCondition?,
-        formatter: OutputFormatting,
-        isJson: Bool
+    private func login(
+        _ parsedURL: URL, until untilCondition: UntilCondition?, timeoutSeconds: Int, formatter: OutputFormatting
     ) async throws {
+        let (width, height) = globals.viewportSize
         let engine = BrowserEngine(viewportWidth: width, viewportHeight: height)
-        engine.setUserAgent(userAgent)
+        engine.setUserAgent(globals.userAgent)
 
-        // Restore existing session if any (to pre-fill cookies)
-        if !noSession {
-            _ = try? await SessionRestore.restore(engine: engine, session: sessionName)
+        // Pre-fill cookies from an existing session.
+        if !globals.noSession {
+            _ = try? await SessionRestore.restore(engine: engine, session: globals.session)
         }
 
-        // Navigate to the login URL
         _ = try await engine.navigate(to: parsedURL)
-
-        // Show the window for manual interaction
         await engine.showWindow()
-
-        // Print instructions to stderr
         FileHandle.standardError.write(
             Data("Log in manually. Periscope will detect when you're done.\n".utf8))
 
-        // Wait for login completion with timeout
         do {
             try await withTimeout(seconds: timeoutSeconds) {
                 try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
@@ -114,19 +73,16 @@ struct Login: ParsableCommand {
             throw PeriscopeError.timeout(seconds: timeoutSeconds)
         }
 
-        // Hide the window
         engine.hideWindow()
 
-        // Save session
-        if !noSession {
-            try await SessionRestore.save(
-                engine: engine, session: sessionName, fallbackURL: urlString)
+        if !globals.noSession {
+            try await SessionRestore.save(engine: engine, session: globals.session, fallbackURL: url)
         }
 
         print(
             formatter.format(
                 .plain(
-                    "\(noSession ? "Login done; not saved (--no-session)" : "Session '\(sessionName)' saved"). URL: \(engine.currentURL ?? urlString)"
+                    "\(globals.noSession ? "Login done; not saved (--no-session)" : "Session '\(globals.session)' saved"). URL: \(engine.currentURL ?? url)"
                 )))
         engine.close()
     }

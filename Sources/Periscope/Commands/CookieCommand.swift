@@ -19,7 +19,6 @@ struct CookieSetCmd: ParsableCommand {
     @Option(name: .long, help: "Path") var path: String = "/"
     @Flag(name: .long, help: "Secure") var secure: Bool = false
     func run() throws {
-        let (name, value, domain, path, secure) = (name, value, domain, path, secure)
         CommandRunner.run(globals: globals) { engine in
             guard let host = domain ?? engine.currentURL.flatMap({ URL(string: $0)?.host }) else {
                 throw PeriscopeError.argumentError(reason: "No page loaded; pass --domain")
@@ -44,7 +43,6 @@ struct CookieDeleteCmd: ParsableCommand {
     @Argument(help: "Cookie name") var name: String
     @Option(name: .long, help: "Only on this domain") var domain: String?
     func run() throws {
-        let (name, domain) = (name, domain)
         CommandRunner.run(globals: globals) { engine in
             let victims = await engine.allCookies().filter {
                 $0.name == name && (domain == nil || $0.domain == domain)

@@ -7,7 +7,6 @@ struct InstallSkill: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "install-skill",
         abstract: "Install the periscope agent skill into this project, or --global")
-    @Flag(name: .long, help: "Claude Code: .claude/skills/periscope (the default)") var claude = false
     @Flag(name: .long, help: "Codex and other agents: .agents/skills/periscope") var codex = false
     @Flag(name: .long, help: "Both") var all = false
     @Flag(name: .long, help: "Under your home directory instead of the current one") var global = false
@@ -18,7 +17,7 @@ struct InstallSkill: ParsableCommand {
             ? FileManager.default.homeDirectoryForCurrentUser
             : URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         var roots: [String] = []
-        if claude || all || !codex { roots.append(".claude/skills") }
+        if all || !codex { roots.append(".claude/skills") }
         if codex || all { roots.append(".agents/skills") }
 
         for root in roots {

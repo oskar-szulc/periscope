@@ -12,16 +12,14 @@ struct Screenshot: ParsableCommand {
         // MainActor, by which time the daemon's interception context -- which is
         // what knows the client's directory -- has been torn down.
         let destination = path.map(CommandRunner.resolvePath)
-        let reportedPath = path
-        let full = full
 
         CommandRunner.run(globals: globals) { engine in
             try await engine.waitFor(.fetchquiet(maxMs: nil))
             try await engine.settleForCapture()
             let data = try await engine.takeScreenshot(full: full)
-            if let destination, let reportedPath {
+            if let destination, let path {
                 try data.write(to: URL(fileURLWithPath: destination))
-                return .screenshot(path: reportedPath)
+                return .screenshot(path: path)
             } else {
                 return .plain(data.base64EncodedString())
             }

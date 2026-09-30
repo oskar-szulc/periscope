@@ -16,9 +16,6 @@ struct Requests: ParsableCommand {
     var unresolved: Bool = false
 
     func run() throws {
-        let match = match
-        let settle = settle
-        let unresolved = unresolved
         CommandRunner.run(globals: globals) { engine in
             try await engine.settleRequests(maxMs: settle)
             var items = try await engine.recordedRequests()
@@ -40,7 +37,6 @@ struct Console: ParsableCommand {
     var level: String?
 
     func run() throws {
-        let level = level
         CommandRunner.run(globals: globals) { engine in
             var items = try await engine.consoleMessages()
             if let level { items = items.filter { $0.level == level } }

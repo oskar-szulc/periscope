@@ -30,9 +30,8 @@ enum CommandRunner {
         // Browser settings a command asks for (--user-agent, --resource-mode)
         // apply here, on both paths: the daemon re-parses argv, so its copy of
         // `globals` is the client's.
-        let (userAgent, resourceMode) = (globals.userAgent, globals.resourceMode)
         let command: CommandBlock = { engine in
-            await engine.configure(userAgent: userAgent, resourceMode: resourceMode)
+            await engine.configure(userAgent: globals.userAgent, resourceMode: globals.resourceMode)
             return try await original(engine)
         }
 
@@ -103,28 +102,21 @@ enum CommandRunner {
 
                     print(formatter.format(result))
                     await MainActor.run { engine.close() }
-                } catch let error as PeriscopeError {
-                    if case .timeout = error {
+                } catch {
+                    if case PeriscopeError.timeout = error {
                         let at = await MainActor.run { engine.locationDescription }
                         FileHandle.standardError.write(Data("Page at timeout: \(at)\n".utf8))
                     }
-                    emit(ErrorPayload(error), formatter: formatter, globals: globals)
+                    let payload = ErrorPayload(error)
+                    emit(payload, formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
-                    Foundation.exit(error.exitCode)
-                } catch {
-                    emit(
-                        ErrorPayload(
-                            code: "INTERNAL",
-                            message: error.localizedDescription, exitCode: 1),
-                        formatter: formatter, globals: globals)
-                    await MainActor.run { engine.close() }
-                    Foundation.exit(1)
+                    Foundation.exit(payload.exitCode)
                 }
             }
         }
     }
 
-    private static func emit(_ payload: ErrorPayload, formatter: OutputFormatting, globals: GlobalOptions) {
+    static func emit(_ payload: ErrorPayload, formatter: OutputFormatting, globals: GlobalOptions) {
         let output = formatter.formatError(payload)
         if globals.json {
             print(output)

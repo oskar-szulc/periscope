@@ -30,29 +30,14 @@ struct Eval: ParsableCommand {
             // For multi-statement scripts, wrap in eval() so the last expression
             // value is returned. This is safe here since the eval command's entire
             // purpose is to execute arbitrary user-provided JavaScript.
-            let result: Any?
-            if script.contains(";") || script.contains("\n") {
-                result = try await engine.runJavaScript("eval(\(ElementResolver.jsString(script)))")
-            } else {
-                result = try await engine.runJavaScript(script)
-            }
-            let str: String?
-            if let result {
-                if let s = result as? String {
-                    str = s
-                } else if let n = result as? NSNumber {
-                    str = n.stringValue
-                } else if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted]),
-                    let json = String(data: data, encoding: .utf8)
-                {
-                    str = json
-                } else {
-                    str = String(describing: result)
-                }
-            } else {
-                str = nil
-            }
-            return .jsResult(value: str)
+            let multi = script.contains(";") || script.contains("\n")
+            let result = try await engine.runJavaScript(multi ? "eval(\(ElementResolver.jsString(script)))" : script)
+            return .jsResult(
+                value: result.map { r in
+                    (r as? String) ?? (r as? NSNumber)?.stringValue
+                        ?? (try? JSONSerialization.data(withJSONObject: r, options: [.prettyPrinted]))
+                        .flatMap { String(data: $0, encoding: .utf8) } ?? String(describing: r)
+                })
         }
     }
 }

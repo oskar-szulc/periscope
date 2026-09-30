@@ -220,7 +220,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
         } catch {
             warnings.append("unexpected error: \(error)")
             response = .failure(
-                ErrorPayload(code: "INTERNAL", message: error.localizedDescription, exitCode: 1),
+                ErrorPayload(error),
                 warnings: warnings)
         }
 

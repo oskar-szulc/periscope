@@ -66,7 +66,6 @@ enum CommandResult: Sendable, Codable {
     /// A string that is already JSON: printed verbatim in both text and --json
     /// modes, so `extract` output is not wrapped or double-encoded.
     case rawJSON(String)
-    case error(String)
 }
 
 protocol OutputFormatting: Sendable {

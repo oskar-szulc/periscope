@@ -25,7 +25,6 @@ struct Click: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
     @Argument(help: ArgumentHelp(stringLiteral: targetHelp)) var selector: String
     func run() throws {
-        let globals = globals
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
             try await engine.click(selector: selector, strict: globals.strict)
@@ -43,8 +42,6 @@ struct Fill: ParsableCommand {
     @Flag(name: .long, help: "Press Enter afterwards, submitting the field's form")
     var submit: Bool = false
     func run() throws {
-        let globals = globals
-        let submit = submit
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
             try await engine.fill(selector: selector, value: value, strict: globals.strict)
@@ -99,7 +96,6 @@ struct Submit: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "Form, or a field inside it (optional; defaults to the first form)") var selector: String?
     func run() throws {
-        let globals = globals
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
             try await engine.submit(selector: selector)
@@ -154,7 +150,6 @@ struct Mouse: ParsableCommand {
         if action == .scroll && dx == 0 && dy == 0 {
             throw PeriscopeError.argumentError(reason: "mouse scroll needs --dy and/or --dx")
         }
-        let (globals, action, x, y, dx, dy) = (globals, action, x, y, dx, dy)
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
             if action == .scroll { engine.wheel(x: x, y: y, dx: dx, dy: dy) } else { try engine.mouse(action, x: x, y: y) }
@@ -176,7 +171,6 @@ struct TypeText: ParsableCommand {
     @Flag(name: .long, help: "Press Enter afterwards") var submit: Bool = false
 
     func run() throws {
-        let (globals, selector, text, delayMs, submit) = (globals, selector, text, delayMs, submit)
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
             try await engine.type(

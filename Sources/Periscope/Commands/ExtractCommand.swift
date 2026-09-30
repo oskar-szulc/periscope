@@ -12,9 +12,8 @@ struct Extract: ParsableCommand {
     @Flag(name: .long, help: "Drop link targets, keeping the link text (use links or state for URLs)") var noLinks: Bool = false
 
     func run() throws {
-        let (links, images) = (!noLinks, images)
         CommandRunner.run(globals: globals) { engine in
-            let content = try await engine.extractText(selector: selector, raw: raw, links: links, images: images)
+            let content = try await engine.extractText(selector: selector, raw: raw, links: !noLinks, images: images)
             return .extract(content: content)
         }
     }
@@ -53,10 +52,12 @@ struct Links: ParsableCommand {
     var match: String?
 
     func run() throws {
-        let match = match
         CommandRunner.run(globals: globals) { engine in
             var links = try await engine.extractLinks()
-            if let match { links = try LinkFilter.apply(pattern: match, to: links) }
+            if let match {
+                let matches = try RegexFilter.matcher(match)
+                links = links.filter { matches($0.url) }
+            }
             return .links(links)
         }
     }

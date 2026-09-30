@@ -29,12 +29,8 @@ struct State: ParsableCommand {
     var out: String?
 
     func run() throws {
-        let actionsOnly = actionsOnly
-        let textLimit = textLimit
-        let match = match
         let limit: Int? = all ? nil : StateFilter.defaultLimit
         let outPath = out.map(CommandRunner.resolvePath)
-        let json = globals.json
 
         CommandRunner.run(globals: globals) { engine in
             guard
@@ -62,7 +58,7 @@ struct State: ParsableCommand {
             state = try StateFilter.apply(state, match: match, limit: outPath == nil ? limit : nil)
 
             if let outPath {
-                let rendered = makeFormatter(json: json).format(.state(state))
+                let rendered = makeFormatter(json: globals.json).format(.state(state))
                 do {
                     try rendered.write(toFile: outPath, atomically: true, encoding: .utf8)
                 } catch {

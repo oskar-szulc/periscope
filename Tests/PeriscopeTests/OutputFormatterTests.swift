@@ -26,8 +26,8 @@ struct TextFormatterTests {
     }
 
     @Test func errorOutput() {
-        let result = CommandResult.error("Element not found: #foo")
-        let output = formatter.format(result)
+        let output = formatter.formatError(
+            ErrorPayload(code: "ELEMENT_NOT_FOUND", message: "Element not found: #foo", exitCode: 3))
         #expect(output == "Error: Element not found: #foo")
     }
 
@@ -74,10 +74,10 @@ struct JSONFormatterTests {
     }
 
     @Test func errorOutput() throws {
-        let result = CommandResult.error("Element not found: #foo")
-        let output = formatter.format(result)
+        let output = formatter.formatError(
+            ErrorPayload(code: "ELEMENT_NOT_FOUND", message: "Element not found: #foo", exitCode: 3))
         let json = try JSONSerialization.jsonObject(with: Data(output.utf8)) as! [String: Any]
         #expect(json["ok"] as? Bool == false)
-        #expect(json["error"] as? String == "Element not found: #foo")
+        #expect((json["error"] as? [String: Any])?["message"] as? String == "Element not found: #foo")
     }
 }

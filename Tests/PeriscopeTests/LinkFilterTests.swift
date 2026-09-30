@@ -11,19 +11,22 @@ struct LinkFilterTests {
         LinkItem(text: "Images", url: "https://www.google.com/search?tbm=isch"),
     ]
 
+    private func kept(_ pattern: String) throws -> [String] {
+        let matches = try RegexFilter.matcher(pattern)
+        return links.map(\.url).filter(matches)
+    }
+
     @Test func keepsOnlyURLsMatchingTheRegex() throws {
-        let kept = try LinkFilter.apply(pattern: #"ashbyhq\.com/[^/]+/[0-9a-f]+$"#, to: links)
-        #expect(kept.map(\.url) == ["https://jobs.ashbyhq.com/acme/1111"])
+        #expect(try kept(#"ashbyhq\.com/[^/]+/[0-9a-f]+$"#) == ["https://jobs.ashbyhq.com/acme/1111"])
     }
 
     @Test func matchIsUnanchoredByDefault() throws {
-        let kept = try LinkFilter.apply(pattern: "ashbyhq", to: links)
-        #expect(kept.count == 2)
+        #expect(try kept("ashbyhq").count == 2)
     }
 
     @Test func invalidRegexIsAnArgumentError() {
         #expect(throws: PeriscopeError.self) {
-            try LinkFilter.apply(pattern: "(", to: links)
+            try kept("(")
         }
     }
 }

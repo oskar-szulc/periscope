@@ -257,9 +257,7 @@ struct MCPServer {
         let start = min(max(offset, 0), total)
         let end = min(start + maxChars, total)
         guard start > 0 || end < total else { return body }
-        let from = text.index(text.startIndex, offsetBy: start)
-        let to = text.index(from, offsetBy: end - start)
-        var piece = String(text[from..<to])
+        var piece = String(text.dropFirst(start).prefix(end - start))
         piece +=
             end < total
             ? "\n\n[cut: characters \(start)–\(end) of \(total); call again with offset=\(end) for more]"

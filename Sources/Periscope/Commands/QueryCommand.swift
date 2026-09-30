@@ -45,9 +45,6 @@ struct Query: ParsableCommand {
     }
 
     static func execute(globals: GlobalOptions, prompt: String, findElement: Bool) {
-        let isJson = globals.json
-        let isFind = findElement
-        let q = prompt
 
         CommandRunner.run(globals: globals) { engine in
             // Extract page summary
@@ -64,10 +61,10 @@ struct Query: ParsableCommand {
                     reason: "Apple Intelligence is not available on this device")
             }
 
-            if isFind {
-                return try await Self.findElement(json: json, question: q, asJson: isJson)
+            if findElement {
+                return try await Self.findElement(json: json, question: prompt, asJson: globals.json)
             } else {
-                return try await Self.answerQuestion(json: json, question: q)
+                return try await Self.answerQuestion(json: json, question: prompt)
             }
         }
     }

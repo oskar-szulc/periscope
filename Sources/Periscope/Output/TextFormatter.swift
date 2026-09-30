@@ -8,10 +8,8 @@ struct TextFormatter: OutputFormatting {
             return "Navigated to: \(title ?? "(untitled)")\nURL: \(url)"
                 + "\nStatus: \(statusText) \u{00B7} Text: \(Self.grouped(textChars)) chars"
                 + " \u{00B7} HTML: \(Self.grouped(htmlChars)) chars"
-        case .extract(let content):
-            return content
-        case .html(let content):
-            return content
+        case .extract(let s), .html(let s), .plain(let s), .rawJSON(let s):
+            return s
         case .links(let items):
             return items.map { "- [\($0.text)](\($0.url))" }.joined(separator: "\n")
         case .elements(let items):
@@ -58,12 +56,6 @@ struct TextFormatter: OutputFormatting {
             return items.map { item in
                 "[\(item.level)] \(item.text)" + (item.source.map { " (\($0))" } ?? "")
             }.joined(separator: "\n")
-        case .plain(let text):
-            return text
-        case .rawJSON(let json):
-            return json
-        case .error(let message):
-            return "Error: \(message)"
         }
     }
 
@@ -75,13 +67,7 @@ struct TextFormatter: OutputFormatting {
     /// verbatim in the next command.
     /// Digit grouping independent of the user's locale, so output is greppable.
     static func grouped(_ n: Int) -> String {
-        let digits = Array(String(n))
-        var out: [Character] = []
-        for (i, d) in digits.enumerated() {
-            if i > 0 && (digits.count - i) % 3 == 0 { out.append(",") }
-            out.append(d)
-        }
-        return String(out)
+        n.formatted(.number.locale(Locale(identifier: "en_US")))
     }
 
     private static func renderState(_ state: PageStateData) -> String {

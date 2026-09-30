@@ -100,17 +100,8 @@ struct JSONFormatter: OutputFormatting {
             return json
         case .plain(let text):
             dict = ["ok": true, "text": text]
-        case .error(let message):
-            dict = ["ok": false, "error": message]
         }
-        guard
-            let data = try? JSONSerialization.data(
-                withJSONObject: dict, options: [.sortedKeys]),
-            let string = String(data: data, encoding: .utf8)
-        else {
-            return "{\"ok\":false,\"error\":\"Failed to serialize JSON\"}"
-        }
-        return string
+        return Self.serialize(dict, fallback: #"{"ok":false,"error":"Failed to serialize JSON"}"#)
     }
 
     func formatError(_ payload: ErrorPayload) -> String {
@@ -121,14 +112,11 @@ struct JSONFormatter: OutputFormatting {
         if let url = payload.url { error["url"] = url }
         if let candidates = payload.candidates { error["candidates"] = candidates }
 
-        let dict: [String: Any] = ["ok": false, "error": error]
-        guard
-            let data = try? JSONSerialization.data(
-                withJSONObject: dict, options: [.sortedKeys]),
-            let string = String(data: data, encoding: .utf8)
-        else {
-            return "{\"ok\":false,\"error\":{\"code\":\"INTERNAL\"}}"
-        }
-        return string
+        return Self.serialize(["ok": false, "error": error], fallback: #"{"ok":false,"error":{"code":"INTERNAL"}}"#)
+    }
+
+    private static func serialize(_ dict: [String: Any], fallback: String) -> String {
+        (try? JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? fallback
     }
 }
