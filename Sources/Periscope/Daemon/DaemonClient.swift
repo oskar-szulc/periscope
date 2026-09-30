@@ -69,7 +69,8 @@ enum DaemonClient {
 
     private static func connectOrSpawn() -> Int32? {
         if let fd = connect() { return fd }
-        guard spawnDaemon() else { return nil }
+        // A daemon spawned from inside a sandbox inherits it and hangs.
+        guard !Sandbox.isActive, spawnDaemon() else { return nil }
 
         var fd: Int32?
         _ = SocketIO.poll(seconds: spawnBudget) {

@@ -41,6 +41,13 @@ enum CommandRunner {
             return
         }
 
+        // In-process needs the window server, which a sandbox denies: it would
+        // hang, not fail.
+        if Sandbox.isActive {
+            emit(ErrorPayload(Sandbox.error), formatter: makeFormatter(json: globals.json), globals: globals)
+            Foundation.exit(Sandbox.error.exitCode)
+        }
+
         runInProcess(globals: globals, command: command)
     }
 

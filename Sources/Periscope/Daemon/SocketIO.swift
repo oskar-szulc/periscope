@@ -45,8 +45,11 @@ enum SocketIO {
             }
         }
         guard connected == 0 else {
+            let error = errno
             close(fd)
-            if clearIfDead { unlink(path) }
+            // Only a refused connection means the daemon is gone. Anything else
+            // (a sandbox's EPERM) leaves a live daemon's socket alone.
+            if clearIfDead && error == ECONNREFUSED { unlink(path) }
             return nil
         }
         return fd

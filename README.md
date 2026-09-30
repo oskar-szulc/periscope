@@ -83,10 +83,10 @@ For web browsing, use the `periscope` CLI. Reference: /path/to/periscope/PERISCO
 ```
 
 **Running under a sandbox (e.g. Claude Code):** the daemon is reached over a unix
-socket at `~/.periscope/run/sock`. If the agent's shell sandbox blocks that socket,
-every command hangs silently instead of erroring. Run periscope commands with the
-sandbox disabled for that tool. As a canary, `periscope daemon status` returns
-instantly when the socket is reachable and hangs when it is not.
+socket at `~/.periscope/run/sock`, and in-process runs need the window server. A
+shell sandbox denies both, so inside one every command exits 3 at once with
+`periscope cannot run inside a sandbox`. Run periscope commands with the sandbox
+disabled for that tool.
 
 ### Claude Code skill
 

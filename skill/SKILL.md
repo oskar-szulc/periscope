@@ -82,7 +82,7 @@ Fields send those records (not the raw page) to the model. When the model is una
 
 ## Preflight when anything misbehaves
 
-1. **Sandbox.** Inside the Claude Code Bash sandbox the daemon's unix socket is blocked and every periscope command hangs silently instead of erroring. This has been observed; treat it as known evidence. Run `periscope daemon status` once with a 15 second timeout as a canary. If it hangs, run all periscope calls for the rest of the session with `dangerouslyDisableSandbox: true`.
+1. **Sandbox.** periscope cannot run inside the Claude Code Bash sandbox (window server and daemon socket are denied). Every command there exits 3 at once with `periscope cannot run inside a sandbox`. Run all periscope calls with `dangerouslyDisableSandbox: true`.
    A slow network looks similar from outside. Each `navigate` has a 30 second default timeout and the script issues up to five, so two minutes of silence with the sandbox off means slow navigations, not a hang. Rerun one `navigate` with `--verbose` to watch events on stderr.
 2. **`NSURLError -1003` / "hostname could not be found".** Machine DNS is down, not periscope. Confirm with `curl -sI https://example.com`.
 3. **`periscope daemon status`** shows live sessions and uptime. A leftover `eqv-daemon-*` session is test residue and harmless.
@@ -102,7 +102,7 @@ Fields send those records (not the raw page) to the model. When the model is una
 |---|---|
 | Plan for CAPTCHA with delays and single attempts | One plain search warms the session; then operator queries pass. |
 | `document.querySelector("#pnnext")` for page 2 | Returns null now; page 2 silently skipped. Match "Next" text or use `start=`. |
-| Waiting on a hung command in the sandbox | It never returns. Unix socket blocked. Disable sandbox for periscope calls. |
+| Retrying after `cannot run inside a sandbox` (exit 3) | It will fail the same way. Rerun with the sandbox disabled. |
 | Empty output taken as "no jobs" | Exit 6 means wrong page; exit 0 with no lines means Google truly returned nothing. Check the navigate report's `Text:` count too. |
 | Grepping `text` for "unusual traffic" | `navigate` already exits 5 with `BLOCKED`. Branch on the exit code. |
 | Trusting `WebSearch` with `(A OR B) (C OR D)` | It returned a California hospice job for an Ontario-only query. Filter results yourself or use periscope. |
