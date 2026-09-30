@@ -20,6 +20,14 @@ struct BlockDetectorTests {
         #expect(kind == .googleCaptcha)
     }
 
+    @Test func googleVerifyingInterstitial() {
+        let kind = BlockDetector.classify(
+            url: "https://www.google.com/search?q=site%3Ax.com",
+            title: "site:x.com - Google Search",
+            text: "Sign in\nVerifying your request\nYou'll be able to continue in a few seconds. Don't refresh this page.")
+        #expect(kind == .googleCaptcha)
+    }
+
     @Test func duckduckgoChallenge() {
         let kind = BlockDetector.classify(
             url: "https://html.duckduckgo.com/html/?q=x",

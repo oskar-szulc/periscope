@@ -18,8 +18,11 @@ enum BlockDetector {
         let title = title.lowercased()
         let text = text.lowercased()
 
+        // "Verifying your request" is Google's soft interstitial: it never
+        // clears for a session whose cookies came from a different user agent.
         if url.contains("google."),
-           url.contains("/sorry/") || text.contains("unusual traffic from your computer network") {
+           url.contains("/sorry/") || text.contains("unusual traffic from your computer network")
+            || text.contains("verifying your request") {
             return .googleCaptcha
         }
         if url.contains("duckduckgo.com"), text.contains("bots use duckduckgo too") {
