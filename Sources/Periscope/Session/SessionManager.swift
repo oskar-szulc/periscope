@@ -19,8 +19,7 @@ struct SessionManager {
         if let baseDir {
             self.baseDir = baseDir
         } else {
-            self.baseDir = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".periscope/sessions")
+            self.baseDir = DaemonPaths.base.appendingPathComponent("sessions")
         }
     }
 

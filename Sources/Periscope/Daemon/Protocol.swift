@@ -6,21 +6,47 @@ import Foundation
 let periscopeProtocolVersion = 6
 
 enum DaemonPaths {
-    /// Runtime state lives beside the sessions it serves.
-    static var runDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".periscope/run")
+    /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
+    /// project's sessions (and its own daemon) apart from the rest.
+    static var base: URL {
+        if let dir = ProcessInfo.processInfo.environment["PERISCOPE_DIR"], !dir.isEmpty {
+            return URL(fileURLWithPath: dir, isDirectory: true)
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".periscope")
     }
 
-    static var socket: URL { runDirectory.appendingPathComponent("sock") }
+    /// Runtime state lives beside the sessions it serves.
+    static var runDirectory: URL { base.appendingPathComponent("run") }
+
+    /// A unix socket path must fit sun_path (104 bytes on macOS). A deep
+    /// PERISCOPE_DIR would not, and the daemon silently never started; such a
+    /// socket goes in a per-user 0700 directory under /tmp, named by the
+    /// directory's hash (FNV-1a: Swift's hashValue changes per process).
+    static var socket: URL {
+        let local = runDirectory.appendingPathComponent("sock")
+        guard local.path.utf8.count >= 100 else { return local }
+        let hash = runDirectory.path.utf8.reduce(UInt64(0xcbf29ce484222325)) { ($0 ^ UInt64($1)) &* 0x100000001b3 }
+        return socketFallbackDirectory.appendingPathComponent(String(hash, radix: 16) + ".sock")
+    }
+    private static var socketFallbackDirectory: URL {
+        URL(fileURLWithPath: "/tmp/periscope-\(getuid())", isDirectory: true)
+    }
+    static var log: URL { runDirectory.appendingPathComponent("daemon.log") }
     static var lock: URL { runDirectory.appendingPathComponent("lock") }
 
     /// The socket is the authentication boundary: 0700 on the directory means
     /// only the owning uid can reach it.
     static func ensureRunDirectory() throws {
-        try FileManager.default.createDirectory(
-            at: runDirectory, withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700])
+        for dir in [runDirectory, socket.deletingLastPathComponent()] {
+            try FileManager.default.createDirectory(
+                at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            // /tmp is shared: a directory someone else created first must not
+            // hold our socket, or they could impersonate the daemon.
+            var info = stat()
+            guard lstat(dir.path, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o077 == 0 else {
+                throw PeriscopeError.sessionError(reason: "\(dir.path) is not a private directory owned by you")
+            }
+        }
     }
 }
 

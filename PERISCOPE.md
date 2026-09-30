@@ -380,6 +380,13 @@ periscope serve                          # Run in the foreground (development)
 | `--first` | off | Act on the first match when a target matches several (default: error with candidates) |
 | `--verbose` | off | Navigation events on stderr |
 
+## Where state lives
+
+Sessions and the daemon's socket live in `~/.periscope`. Set `PERISCOPE_DIR` to keep a
+project's sessions apart; that directory gets its own daemon. `periscope daemon log`
+prints the daemon log's path and its last lines (`--lines N`), the first place to look
+when the daemon misbehaves.
+
 ## Unattended runs
 
 Pages render only while macOS counts the window as visible. While the display sleeps

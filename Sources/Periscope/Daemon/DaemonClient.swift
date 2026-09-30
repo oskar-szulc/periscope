@@ -104,8 +104,19 @@ enum DaemonClient {
         guard let executable = Bundle.main.executableURL else { return false }
         process.executableURL = executable
         process.arguments = ["serve"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        // Kept for `daemon log`: WebKit and the daemon report crashes on stderr.
+        // Truncated past 1 MB at each spawn rather than rotated.
+        let logPath = DaemonPaths.log.path
+        if let size = try? FileManager.default.attributesOfItem(atPath: logPath)[.size] as? Int, size > 1 << 20 {
+            try? FileManager.default.removeItem(atPath: logPath)
+        }
+        if !FileManager.default.fileExists(atPath: logPath) {
+            FileManager.default.createFile(atPath: logPath, contents: nil)
+        }
+        let log = FileHandle(forWritingAtPath: logPath)
+        log?.seekToEndOfFile()
+        process.standardOutput = log ?? FileHandle.nullDevice
+        process.standardError = log ?? FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         do {
             try process.run()

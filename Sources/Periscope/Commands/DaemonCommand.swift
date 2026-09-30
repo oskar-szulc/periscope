@@ -43,7 +43,7 @@ struct DaemonGroup: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "daemon",
         abstract: "Inspect or stop the session daemon",
-        subcommands: [DaemonStatus.self, DaemonStop.self])
+        subcommands: [DaemonStatus.self, DaemonStop.self, DaemonLog.self])
 }
 
 struct DaemonStatus: ParsableCommand {
@@ -98,5 +98,21 @@ struct DaemonStop: ParsableCommand {
         }
         print("daemon: stopping (pid \(status.pid)), "
               + "\(status.sessions.count) session(s) flushed to disk")
+    }
+}
+
+struct DaemonLog: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "log", abstract: "Print the daemon log's path and its last lines")
+    @Option(name: .long, help: "How many lines") var lines: Int = 40
+
+    func run() throws {
+        let path = DaemonPaths.log.path
+        print(path)
+        guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+            print("(no log yet: the daemon writes one once started)")
+            return
+        }
+        print(text.split(separator: "\n", omittingEmptySubsequences: false).suffix(lines).joined(separator: "\n"))
     }
 }
