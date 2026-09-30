@@ -13,9 +13,11 @@ periscope click "text:Next" --session demo
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oskar-szulc/periscope/main/install.sh | sh
+brew install oskar-szulc/tap/periscope
 periscope install-skill    # adds the agent skill to this project
 ```
+
+Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/oskar-szulc/periscope/main/install.sh | sh`
 
 To build from source instead (Xcode 26): `swift build -c release`, then copy
 `.build/release/periscope` onto your PATH.
