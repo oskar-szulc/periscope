@@ -1,7 +1,7 @@
 {
   "name": "periscope",
   "description": "Browse, read and scrape the web through a real Safari engine: sessions that stay open, bot-check detection, structured extraction. Needs the periscope CLI (brew install oskar-szulc/tap/periscope).",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "author": { "name": "Oskar Szulc" },
   "homepage": "https://github.com/oskar-szulc/periscope",
   "repository": "https://github.com/oskar-szulc/periscope",
