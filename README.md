@@ -1,162 +1,96 @@
-# Periscope
+# periscope
 
-A headless browser CLI for AI agents, built on WebKit (Safari's engine).
+A browser for AI agents, driven from the shell, running on the WebKit engine
+already in macOS: the same engine, user agent and TLS stack as Safari.
 
-Unlike Playwright/Puppeteer which use Chromium, Periscope uses the native macOS WebKit engine. This means it presents a genuine Safari browser fingerprint that bot detection systems (Cloudflare, DataDome, PerimeterX) don't flag.
+Chromium-based tools and custom engines are easy for bot checks to spot.
+periscope is Safari to the site, and it keeps named sessions alive between
+commands, so an agent can navigate, read, act and come back to the same page.
 
-## Requirements
+```text
+$ periscope navigate https://books.toscrape.com/ --session demo
+Navigated to: All products | Books to Scrape - Sandbox
+URL: https://books.toscrape.com/
+Status: 200 · Text: 1,809 chars · HTML: 50,989 chars
 
-- macOS 26+
-- Xcode 26+ (for building)
-- Apple silicon with Apple Intelligence enabled, for `query`, `find`, and `extract` with fields only. Every other command runs anywhere macOS 26 does.
+$ periscope extract --session demo --json --fields itemSelector,next
+{"itemSelector":"ol.row > li.col-lg-3.col-md-3.col-sm-4.col-xs-6","next":"https://books.toscrape.com/catalogue/page-2.html"}
 
-## Build
+$ periscope state --session demo --match Tipping
+Actions (1):
+  @58  ... > article > h3 > a  a  "Tipping the Velvet" -> catalogue/tipping-the-velvet_999/index.html
 
-```bash
-cd periscope
-swift build -c release --disable-sandbox
+$ periscope click @58 --session demo
+Navigated to: Tipping the Velvet | Books to Scrape - Sandbox
 ```
 
-The binary is at `.build/release/Periscope`.
+`extract` with no arguments needs no AI model: it returns the page's schema.org
+data, its repeated records (cards, results, table rows) and the next-page link.
+Each record looks like
+`{"text": ["Tipping the Velvet", "£53.74", "In stock", …], "links": [...], "image": "…"}`.
 
 ## Install
 
 ```bash
-rm -f /opt/homebrew/bin/periscope
-cp .build/release/Periscope /opt/homebrew/bin/periscope
+curl -fsSL https://raw.githubusercontent.com/oskar-szulc/periscope/main/install.sh | sh
+periscope install-skill            # teach Claude Code (or --codex, --all, --global)
 ```
 
-Or wherever you keep local binaries that's on your PATH.
-
-**Reinstalling, two things that bite:**
-
-- **`rm` first, don't `cp` over the existing file.** macOS caches a binary's code signature per inode; overwriting in place makes the next launch die with exit 137. Removing then copying gives a fresh inode.
-- **Restart the daemon:** `periscope daemon stop`. A running daemon keeps serving the old binary until the wire protocol version changes; stopping it forces the next command to spawn the rebuilt one.
-
-## Quick Start
+Or build from source (Xcode 26):
 
 ```bash
-# Navigate and read content
-periscope navigate "https://example.com" --session demo
-periscope text --session demo
-
-# Take a screenshot
-periscope screenshot /tmp/page.png --session demo
-
-# Execute JavaScript
-periscope eval "document.title" --session demo
-
-# Fill a form (targets can be CSS or semantic: text:/label:/placeholder:/role:)
-periscope fill "label:Search" "query" --session demo --submit
-
-# Pull structured data out as JSON (on-device model)
-periscope extract "title, price, url" --session demo
-
-# Manual login (opens visible browser window)
-periscope login "https://app.example.com/login" --session myapp
+swift build -c release
+rm -f /usr/local/bin/periscope && cp .build/release/periscope /usr/local/bin/periscope
 ```
 
-## How It Works
+Remove, then copy: macOS caches a code signature per inode and kills a binary
+overwritten in place. After upgrading, `periscope daemon stop` so the next
+command starts the new build.
 
-A background daemon holds a live `WebPage` per named session. The CLI is a thin
-client that sends one command over a unix socket at `~/.periscope/run/sock` and
-prints the reply, so commands after the first in a session reuse a browser that
-is genuinely still open — no page reload, and JS state, SPA route and scroll
-position all survive. The daemon starts on demand; you never launch it yourself.
+## What it does
 
-Sessions are also flushed to `~/.periscope/sessions/<name>/` (cookies,
-localStorage, last URL) when evicted or on shutdown, so they survive a reboot
-and cold-start from there.
+- **Reads pages the way agents need them:** `text` (markdown), `state` (content
+  plus every actionable element with a selector and an `@N`), `extract`, `links`,
+  `table`, `requests` (every fetch/XHR and its status), `console`.
+- **Acts like a person:** `click`, `fill`, `select`, `check`, `hover`; `type`
+  sends real key events and `mouse` real clicks, drags and scrolls, which the
+  page sees as trusted. Targets are CSS or what a person sees: `text:Next`,
+  `label:Email`, `role:button name=Sign in`, or `@N` from `state`.
+- **Knows when it is blocked:** Google's CAPTCHA and "verifying" pages,
+  DuckDuckGo's and Cloudflare's challenges exit 5 instead of passing for
+  content. `navigate --wait-challenge 20` lets a self-clearing challenge pass.
+- **Keeps sessions:** a daemon holds one live page per `--session`, so state,
+  cookies and SPA routes survive between commands; sessions are also saved to
+  disk. `login` and `show` hand a page to a person (a login, a CAPTCHA) and take
+  it back.
+- **Stays fast:** `--resource-mode lean` skips images, media and fonts.
 
-`--no-daemon` runs everything in-process instead: correct, but it rebuilds the
-page from that snapshot on every command. It is the automatic fallback whenever
-the daemon cannot be reached, so periscope never hard-fails on daemon trouble.
+The full reference, written for agents, is [PERISCOPE.md](PERISCOPE.md).
 
-## Agent Integration
+## Requirements and limits
 
-See [PERISCOPE.md](PERISCOPE.md) for the full command reference designed for AI agents.
+- **macOS 26 or newer**, in a logged-in desktop session. It does not run on
+  Linux, in Docker or on a headless server.
+- **The display must be on** while it works. With the display asleep or the
+  screen locked, macOS stops page rendering callbacks. Wrap unattended runs in
+  `caffeinate -d`.
+- **Not inside a sandbox.** A shell sandbox (like Claude Code's Bash tool) blocks
+  the window server; periscope says so and exits 3 rather than hanging.
+- **Apple Intelligence** is used only by `query`, `find` and `extract` with
+  field names. Everything else works without it.
 
-To make periscope available to agents, point them to PERISCOPE.md or add it to their context. For Claude Code, add to your CLAUDE.md:
+## How it works
 
-```
-For web browsing, use the `periscope` CLI. Reference: /path/to/periscope/PERISCOPE.md
-```
+The CLI is a thin client. Each command goes over a unix socket to a daemon,
+started on demand, that owns a hidden WebKit window per session. The window
+stays one pixel on screen so macOS treats the page as visible. Without that,
+WebKit pauses rendering and pages that draw on a frame, such as React
+streaming, never finish. `--no-daemon`, or an unreachable daemon, runs the
+command in-process instead, which works but reloads the page every time.
 
-**Running under a sandbox (e.g. Claude Code):** the daemon is reached over a unix
-socket at `~/.periscope/run/sock`, and in-process runs need the window server. A
-shell sandbox denies both, so inside one every command exits 3 at once with
-`periscope cannot run inside a sandbox`. Run periscope commands with the sandbox
-disabled for that tool.
+`PERISCOPE_DIR` keeps a project's sessions (and its own daemon) apart from
+`~/.periscope`. `periscope daemon log` shows what the daemon reported.
 
-### Claude Code skill
+## Contributing
 
-The repo ships a Claude Code skill in [`skill/`](skill/): a `SKILL.md` that tells the
-agent when to reach for periscope and the failure modes seen in practice, plus a
-`scripts/gsearch.sh` helper that runs a Google search (warm-up, redirect unwrapping,
-paging, block detection) end to end. Install it into your Claude config:
-
-```bash
-# Recommended: symlink, so the repo stays the source of truth and edits flow through
-ln -s "$PWD/skill" ~/.claude/skills/periscope
-
-# Or copy it in
-cp -R skill ~/.claude/skills/periscope
-```
-
-The skill's text assumes the standard install — the binary at
-`/opt/homebrew/bin/periscope` and this repo's `PERISCOPE.md` as the reference. If your
-clone lives elsewhere, update the reference path near the top of `skill/SKILL.md`.
-
-## All Commands
-
-```
-navigate <url>        Go to URL
-back / forward        History navigation
-reload                Reload page
-url                   Print current URL
-history               Print history
-
-state                 URL, content and every actionable selector (--match, --all, --out)
-text [selector]       Content as markdown
-html [selector]       Raw HTML
-attr <sel> <attr>     Get attribute value
-links [--match re]    List all links (absolute URLs)
-table <selector>      Extract table
-extract [fields]      Page records as JSON (structured data, repeated items, next page); fields via the on-device model (--from, --items, --prompt)
-
-click <target>        Click element (CSS or text:/label:/placeholder:/role:)
-fill <target> <value> Set input value (--submit to press Enter)
-select <sel> <value>  Choose <select> option
-check / uncheck       Toggle checkbox
-submit [target]       Submit form
-scroll <target>       Scroll (up/down/top/bottom/selector)
-hover <target>        Hover element
-
-screenshot [path]     Take screenshot
-eval <code>           Execute JavaScript
-
-requests [--match|--unresolved|--settle]   Fetch/XHR the page made, with status
-console [--level]     console.* output and uncaught errors
-
-session list/delete/export/import
-cookie list/set/delete
-login <url>           Manual login with visible browser
-wait <strategy>       Wait for condition
-elements <selector>   Inspect matching elements
-
-query <question>      Ask about the page (Apple Intelligence)
-find <description>    Description -> CSS selector
-
-daemon status/stop    Inspect or stop the session daemon
-serve                 Run the daemon in the foreground
-```
-
-Targets for interaction and `--from` accept a CSS selector or a semantic prefix
-(`text:`, `label:`, `placeholder:`, `role:<role> name=<text>`); an ambiguous target
-errors with the candidate selectors listed. Navigation and interaction print an
-HTTP status and text-size line, and fail with exit 5 (`BLOCKED`) on a bot challenge.
-See [PERISCOPE.md](PERISCOPE.md) for flags and behavior.
-
-## License
-
-Private.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Licensed under [MIT](LICENSE).
