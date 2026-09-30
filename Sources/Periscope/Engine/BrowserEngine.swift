@@ -83,6 +83,7 @@ final class BrowserEngine {
     struct PageObservation {
         var title: String?
         var textChars: Int
+        var htmlChars: Int = 0
         var blocked: BlockKind?
     }
 
@@ -90,6 +91,7 @@ final class BrowserEngine {
         var url: String
         var title: String
         var textChars: Int
+        var htmlChars: Int
         var blockText: String
     }
 
@@ -99,12 +101,16 @@ final class BrowserEngine {
     /// awaits to the web content process where one does.
     func observePage() async throws -> PageObservation {
         let script = """
-        JSON.stringify({
-            url: location.href,
-            title: document.title || '',
-            textChars: (document.body && document.body.innerText || '').replace(/\\s+/g, ' ').trim().length,
-            blockText: (document.body && document.body.innerText || '').slice(0, 4000)
-        })
+        (function() {
+            var text = (document.body && document.body.innerText) || '';  // one layout, not two
+            return JSON.stringify({
+                url: location.href,
+                title: document.title || '',
+                textChars: text.replace(/\\s+/g, ' ').trim().length,
+                htmlChars: document.documentElement.outerHTML.length,
+                blockText: text.slice(0, 4000)
+            });
+        })()
         """
         guard let probe: PageProbe = try await runJavaScriptDecoded(script) else {
             return PageObservation(title: nil, textChars: 0, blocked: nil)
@@ -112,6 +118,7 @@ final class BrowserEngine {
         return PageObservation(
             title: probe.title.isEmpty ? nil : probe.title,
             textChars: probe.textChars,
+            htmlChars: probe.htmlChars,
             blocked: BlockDetector.classify(url: probe.url, title: probe.title, text: probe.blockText))
     }
 
@@ -448,6 +455,24 @@ final class BrowserEngine {
     }
 
     // MARK: - Screenshot
+
+    /// Before a capture: images and fonts are not fetch/XHR, so `fetchquiet`
+    /// does not see them. Wait for pending images (3s cap) and fonts, then two
+    /// animation frames, so the capture follows a paint of what loaded.
+    func settleForCapture() async throws {
+        _ = try await runJavaScript("""
+            (async () => {
+                const pending = [...document.images].filter(i => !i.complete)
+                    .map(i => new Promise(r => { i.addEventListener('load', r); i.addEventListener('error', r); }));
+                await Promise.race([Promise.all(pending), new Promise(r => setTimeout(r, 3000))]);
+                if (document.fonts) await document.fonts.ready;
+                // Frames stop while the display sleeps; never wait on them alone.
+                await Promise.race([new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))),
+                                    new Promise(r => setTimeout(r, 500))]);
+                return true;
+            })()
+            """)
+    }
 
     /// Take a screenshot using WebPage.exported(as:) for native image capture.
     func takeScreenshot(full: Bool) async throws -> Data {

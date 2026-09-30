@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 5
+let periscopeProtocolVersion = 6
 
 enum DaemonPaths {
     /// Runtime state lives beside the sessions it serves.

@@ -54,7 +54,7 @@ struct WaitChallengeTests {
         defer { engine.close() }
         _ = try await engine.navigate(to: try challengeFixture())
         let result = try await NavigationReport.make(engine: engine, wait: .none, fallbackURL: "", challengeSeconds: 6)
-        guard case .navigate(let title, _, _, _) = result else { Issue.record("not a navigate result"); return }
+        guard case .navigate(let title, _, _, _, _) = result else { Issue.record("not a navigate result"); return }
         #expect(title == "Real page")
     }
 }

@@ -55,7 +55,7 @@ enum CommandRunner {
 
     /// Print a daemon response exactly as in-process execution would have.
     private static func emitResponse(_ response: Response, globals: GlobalOptions) {
-        let formatter = makeFormatter(json: globals.json)
+        let formatter = makeFormatter(json: globals.json, fields: globals.fields)
 
         for warning in response.warnings {
             FileHandle.standardError.write(Data((warning + "\n").utf8))
@@ -73,7 +73,7 @@ enum CommandRunner {
     /// One-shot execution: boot an app, build an engine, restore, run, save, exit.
     /// Still the fallback whenever the daemon is unavailable or `--no-daemon` is set.
     static func runInProcess(globals: GlobalOptions, command: @escaping CommandBlock) {
-        let formatter = makeFormatter(json: globals.json)
+        let formatter = makeFormatter(json: globals.json, fields: globals.fields)
         let (width, height) = globals.viewportSize
 
         MainActor.assumeIsolated {

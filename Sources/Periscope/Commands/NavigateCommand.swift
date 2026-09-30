@@ -46,7 +46,7 @@ enum NavigationReport {
         if let kind = page.blocked {
             throw PeriscopeError.blocked(kind: kind, url: url)
         }
-        return .navigate(title: page.title, url: url, status: engine.lastStatusCode, textChars: page.textChars)
+        return .navigate(title: page.title, url: url, status: engine.lastStatusCode, textChars: page.textChars, htmlChars: page.htmlChars)
     }
 }
 

@@ -12,7 +12,7 @@ struct SessionList: ParsableCommand {
     @OptionGroup var globals: GlobalOptions
     func run() throws {
         let sessions = try SessionManager().listSessions().sorted()
-        print(makeFormatter(json: globals.json).format(.sessionList(sessions)))
+        print(makeFormatter(json: globals.json, fields: globals.fields).format(.sessionList(sessions)))
     }
 }
 

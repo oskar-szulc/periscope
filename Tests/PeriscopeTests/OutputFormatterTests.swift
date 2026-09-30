@@ -8,17 +8,17 @@ struct TextFormatterTests {
 
     @Test func navigateOutput() {
         let result = CommandResult.navigate(
-            title: "Example", url: "https://example.com/", status: 200, textChars: 1234)
+            title: "Example", url: "https://example.com/", status: 200, textChars: 1234, htmlChars: 51200)
         let output = formatter.format(result)
-        #expect(output == "Navigated to: Example\nURL: https://example.com/\nStatus: 200 \u{00B7} Text: 1,234 chars")
+        #expect(output == "Navigated to: Example\nURL: https://example.com/\nStatus: 200 \u{00B7} Text: 1,234 chars \u{00B7} HTML: 51,200 chars")
     }
 
     @Test func navigateOutputWithoutStatus() {
         // A file:// or about: load has no HTTP response; say so rather than print 0.
         let result = CommandResult.navigate(
-            title: nil, url: "about:blank", status: nil, textChars: 0)
+            title: nil, url: "about:blank", status: nil, textChars: 0, htmlChars: 39)
         let output = formatter.format(result)
-        #expect(output == "Navigated to: (untitled)\nURL: about:blank\nStatus: - \u{00B7} Text: 0 chars")
+        #expect(output == "Navigated to: (untitled)\nURL: about:blank\nStatus: - \u{00B7} Text: 0 chars \u{00B7} HTML: 39 chars")
     }
 
     @Test func errorOutput() {
@@ -49,7 +49,7 @@ struct JSONFormatterTests {
 
     @Test func navigateOutput() throws {
         let result = CommandResult.navigate(
-            title: "Example", url: "https://example.com/", status: 404, textChars: 9)
+            title: "Example", url: "https://example.com/", status: 404, textChars: 9, htmlChars: 120)
         let output = formatter.format(result)
         let json = try JSONSerialization.jsonObject(with: Data(output.utf8)) as! [String: Any]
         #expect(json["ok"] as? Bool == true)
@@ -57,6 +57,15 @@ struct JSONFormatterTests {
         #expect(json["url"] as? String == "https://example.com/")
         #expect(json["status"] as? Int == 404)
         #expect(json["textChars"] as? Int == 9)
+    }
+
+    @Test func fieldsKeepOnlyWhatWasAskedAndOk() throws {
+        let output = JSONFormatter(fields: ["url", "status"]).format(.navigate(
+            title: "Example", url: "https://example.com/", status: 200, textChars: 9, htmlChars: 120))
+        let json = try JSONSerialization.jsonObject(with: Data(output.utf8)) as! [String: Any]
+        #expect(Set(json.keys) == ["ok", "url", "status"])
+        // extract's raw JSON filters the same way.
+        #expect(JSONFormatter(fields: ["next"]).format(.rawJSON(#"{"items":[1],"next":"n"}"#)) == #"{"next":"n"}"#)
     }
 
     @Test func errorOutput() throws {

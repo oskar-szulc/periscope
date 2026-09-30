@@ -25,6 +25,9 @@ struct GlobalOptions: ParsableArguments {
     @Option(name: .long, help: "Wait strategy: none, load, fetchquiet, fetchquiet:<maxMs>, selector:<css>, time:<ms>")
     var wait: String?
 
+    @Option(name: .long, help: "With --json: keep only these comma-separated fields (for state, fields of the state object)")
+    var fields: String?
+
     @Flag(name: .long, help: "Print navigation events to stderr")
     var verbose: Bool = false
 

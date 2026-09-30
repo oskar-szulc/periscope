@@ -3,10 +3,11 @@ import Foundation
 struct TextFormatter: OutputFormatting {
     func format(_ result: CommandResult) -> String {
         switch result {
-        case .navigate(let title, let url, let status, let textChars):
+        case .navigate(let title, let url, let status, let textChars, let htmlChars):
             let statusText = status.map(String.init) ?? "-"
             return "Navigated to: \(title ?? "(untitled)")\nURL: \(url)"
                 + "\nStatus: \(statusText) \u{00B7} Text: \(Self.grouped(textChars)) chars"
+                + " \u{00B7} HTML: \(Self.grouped(htmlChars)) chars"
         case .extract(let content):
             return content
         case .html(let content):

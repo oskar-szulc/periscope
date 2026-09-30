@@ -64,7 +64,7 @@ Status: 404 · Text: 1,017 chars
 ```
 
 `Status` is the main-frame HTTP status (`-` for non-HTTP loads and for `back`/`forward` served from cache). `Text` is the length of the
-settled page's visible text. Check both before trusting `text`: a `404` shell or an SPA that
+settled page's visible text, `HTML` of its markup (what `html` would return). Check both before trusting `text`: a `404` shell or an SPA that
 rendered nothing reads as success otherwise. `--json` carries them as `status` and `textChars`.
 
 If the page that loaded is a bot challenge rather than content, the command **fails with exit 5**
@@ -374,10 +374,25 @@ periscope serve                          # Run in the foreground (development)
 | `--timeout <seconds>` | `30` | Max wait |
 | `--viewport <WxH>` | `1920x1080` | Viewport size |
 | `--user-agent <string>` | Safari's | Override the UA; it sticks for a live session (raises detection risk — usually leave alone) |
+| `--fields a,b` | — | With `--json`, keep only these fields (for `state`, fields of the state object); `extract` output filters the same way |
 | `--resource-mode lean\|full` | `full` | `lean` blocks images, media and fonts: about twice as fast on image-heavy pages. Sticks for a live session; `login` switches back to `full` for the person at the window |
 | `--wait <strategy>` | none | Wait before producing output |
 | `--first` | off | Act on the first match when a target matches several (default: error with candidates) |
 | `--verbose` | off | Navigation events on stderr |
+
+## Unattended runs
+
+Pages render only while macOS counts the window as visible. While the display sleeps
+or the screen is locked, every page reports `visibilityState: "hidden"` and stops
+animation frames, so pages that render on a frame (React streaming, some SPAs) stall.
+For overnight or cron runs, keep the display awake for the duration:
+
+```bash
+caffeinate -d ./my-scrape.sh
+```
+
+A command that times out also resets its session in the daemon (the stuck command
+would otherwise hold it); the next command restarts from the last saved state.
 
 ## Exit codes
 

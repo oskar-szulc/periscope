@@ -47,8 +47,9 @@ struct HistoryItem: Sendable, Codable {
 enum CommandResult: Sendable, Codable {
     /// `status` is the main-frame HTTP status, nil for non-HTTP loads.
     /// `textChars` is the length of the settled page's visible text: a 404
-    /// shell or an empty SPA frame is obvious from a small number.
-    case navigate(title: String?, url: String, status: Int?, textChars: Int)
+    /// shell or an empty SPA frame is obvious from a small number. `htmlChars`
+    /// says what `html` would cost before anyone asks for it.
+    case navigate(title: String?, url: String, status: Int?, textChars: Int, htmlChars: Int)
     case extract(content: String)
     case html(content: String)
     case links([LinkItem])
@@ -75,6 +76,6 @@ protocol OutputFormatting: Sendable {
     func formatError(_ payload: ErrorPayload) -> String
 }
 
-func makeFormatter(json: Bool) -> OutputFormatting {
-    json ? JSONFormatter() : TextFormatter()
+func makeFormatter(json: Bool, fields: String? = nil) -> OutputFormatting {
+    json ? JSONFormatter(fields: fields.map(Extraction.fieldList)) : TextFormatter()
 }

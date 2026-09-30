@@ -17,6 +17,7 @@ struct Screenshot: ParsableCommand {
 
         CommandRunner.run(globals: globals) { engine in
             try await engine.waitFor(.fetchquiet(maxMs: nil))
+            try await engine.settleForCapture()
             let data = try await engine.takeScreenshot(full: full)
             if let destination, let reportedPath {
                 try data.write(to: URL(fileURLWithPath: destination))

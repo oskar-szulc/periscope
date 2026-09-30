@@ -1,12 +1,30 @@
 import Foundation
 
 struct JSONFormatter: OutputFormatting {
+    /// `--fields`: keep only these top-level keys (plus `ok`); for `state`,
+    /// keys of the state object. Applied to the final JSON, so every command,
+    /// `extract`'s raw JSON included, filters the same way.
+    var fields: [String]? = nil
+
     func format(_ result: CommandResult) -> String {
+        let json = render(result)
+        guard let fields, !fields.isEmpty,
+              let data = json.data(using: .utf8),
+              var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return json }
+        func keep(_ dict: [String: Any]) -> [String: Any] {
+            dict.filter { fields.contains($0.key) || $0.key == "ok" }
+        }
+        if let state = object["state"] as? [String: Any] { object["state"] = keep(state) } else { object = keep(object) }
+        guard let out = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes]) else { return json }
+        return String(data: out, encoding: .utf8) ?? json
+    }
+
+    private func render(_ result: CommandResult) -> String {
         let dict: [String: Any]
         switch result {
-        case .navigate(let title, let url, let status, let textChars):
+        case .navigate(let title, let url, let status, let textChars, let htmlChars):
             dict = ["ok": true, "title": title as Any, "url": url,
-                    "status": status as Any, "textChars": textChars]
+                    "status": status as Any, "textChars": textChars, "htmlChars": htmlChars]
         case .extract(let content):
             dict = ["ok": true, "content": content]
         case .html(let content):
