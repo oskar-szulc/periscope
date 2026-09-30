@@ -17,10 +17,12 @@ struct Eval: ParsableCommand {
         // Read here, not inside the block: the block runs later on the MainActor,
         // after the daemon's interception context -- which knows the client's
         // directory -- has been torn down.
-        let script = try file.map {
-            try String(contentsOf: URL(fileURLWithPath: CommandRunner.resolvePath($0)),
-                       encoding: .utf8)
-        } ?? code!
+        let script =
+            try file.map {
+                try String(
+                    contentsOf: URL(fileURLWithPath: CommandRunner.resolvePath($0)),
+                    encoding: .utf8)
+            } ?? code!
 
         CommandRunner.run(globals: globals) { engine in
             // callJavaScript treats the script as a function body, so user
@@ -36,12 +38,20 @@ struct Eval: ParsableCommand {
             }
             let str: String?
             if let result {
-                if let s = result as? String { str = s }
-                else if let n = result as? NSNumber { str = n.stringValue }
-                else if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted]),
-                    let json = String(data: data, encoding: .utf8) { str = json }
-                else { str = String(describing: result) }
-            } else { str = nil }
+                if let s = result as? String {
+                    str = s
+                } else if let n = result as? NSNumber {
+                    str = n.stringValue
+                } else if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted]),
+                    let json = String(data: data, encoding: .utf8)
+                {
+                    str = json
+                } else {
+                    str = String(describing: result)
+                }
+            } else {
+                str = nil
+            }
             return .jsResult(value: str)
         }
     }

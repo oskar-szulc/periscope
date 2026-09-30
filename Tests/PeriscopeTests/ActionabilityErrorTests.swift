@@ -1,6 +1,7 @@
-import Testing
-import Foundation
 import ArgumentParser
+import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("Ambiguity and actionability errors")
@@ -8,8 +9,10 @@ struct ActionabilityErrorTests {
     @Test func multipleMatchesListCandidates() {
         let error = PeriscopeError.multipleElementsFound(
             selector: "input[name=search]", count: 2,
-            candidates: ["#searchInput  input[search] label=\"Search Wikipedia\"",
-                         "#vector-sticky-search-form input  input[search]"])
+            candidates: [
+                "#searchInput  input[search] label=\"Search Wikipedia\"",
+                "#vector-sticky-search-form input  input[search]",
+            ])
         let text = error.description
         #expect(text.hasPrefix("Selector 'input[name=search]' matched 2 elements"))
         #expect(text.contains("#searchInput"))
@@ -18,8 +21,9 @@ struct ActionabilityErrorTests {
     }
 
     @Test func candidatesTravelInThePayload() {
-        let payload = ErrorPayload(PeriscopeError.multipleElementsFound(
-            selector: "a", count: 3, candidates: ["#x", "#y"]))
+        let payload = ErrorPayload(
+            PeriscopeError.multipleElementsFound(
+                selector: "a", count: 3, candidates: ["#x", "#y"]))
         #expect(payload.code == "MULTIPLE_ELEMENTS_FOUND")
         #expect(payload.candidates == ["#x", "#y"])
     }

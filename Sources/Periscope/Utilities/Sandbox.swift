@@ -11,9 +11,10 @@ enum Sandbox {
         return unsafeBitCast(symbol, to: Check.self)(getpid(), nil, 0) != 0
     }()
 
-    static let error = PeriscopeError.sessionError(reason: """
-        periscope cannot run inside a sandbox: it needs the window server and its \
-        daemon's socket (~/.periscope/run/sock), and both are denied here. Run it \
-        outside the sandbox (in Claude Code: dangerouslyDisableSandbox: true).
-        """)
+    static let error = PeriscopeError.sessionError(
+        reason: """
+            periscope cannot run inside a sandbox: it needs the window server and its \
+            daemon's socket (~/.periscope/run/sock), and both are denied here. Run it \
+            outside the sandbox (in Claude Code: dangerouslyDisableSandbox: true).
+            """)
 }

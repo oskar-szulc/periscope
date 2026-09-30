@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("State action filtering")
@@ -9,8 +10,9 @@ struct StateFilterTests {
     }
 
     private func state(_ elements: [PageStateElement]) -> PageStateData {
-        PageStateData(url: "https://example.com/", title: "t", text: "", truncated: false,
-                      elements: elements, headings: [])
+        PageStateData(
+            url: "https://example.com/", title: "t", text: "", truncated: false,
+            elements: elements, headings: [])
     }
 
     @Test func capsActionsAndReportsOmittedCount() throws {
@@ -34,8 +36,9 @@ struct StateFilterTests {
             element("#next", text: "Next", href: "/search?start=10"),
             element("#other", text: "Random"),
         ])
-        #expect(try StateFilter.apply(s, match: "search", limit: 25).elements.map(\.selector)
-            == ["#searchInput", "#next"])
+        #expect(
+            try StateFilter.apply(s, match: "search", limit: 25).elements.map(\.selector)
+                == ["#searchInput", "#next"])
         #expect(try StateFilter.apply(s, match: "(?i)log in", limit: 25).elements.map(\.selector) == ["#login"])
     }
 

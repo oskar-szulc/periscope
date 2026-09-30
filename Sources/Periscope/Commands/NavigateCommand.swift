@@ -23,8 +23,10 @@ enum NavigationReport {
     }
 
     @MainActor
-    static func make(engine: BrowserEngine, wait: WaitStrategy, fallbackURL: String,
-                     challengeSeconds: Int = 0) async throws -> CommandResult {
+    static func make(
+        engine: BrowserEngine, wait: WaitStrategy, fallbackURL: String,
+        challengeSeconds: Int = 0
+    ) async throws -> CommandResult {
         try await engine.waitFor(wait)
 
         // One look at the settled page: title, text size and challenge check.
@@ -46,7 +48,8 @@ enum NavigationReport {
         if let kind = page.blocked {
             throw PeriscopeError.blocked(kind: kind, url: url)
         }
-        return .navigate(title: page.title, url: url, status: engine.lastStatusCode, textChars: page.textChars, htmlChars: page.htmlChars)
+        return .navigate(
+            title: page.title, url: url, status: engine.lastStatusCode, textChars: page.textChars, htmlChars: page.htmlChars)
     }
 }
 
@@ -63,7 +66,9 @@ struct Navigate: ParsableCommand {
         }
         if waitChallenge > 0 && globals.timeout > 0 && waitChallenge + 10 > globals.timeout {
             throw PeriscopeError.argumentError(
-                reason: "--wait-challenge \(waitChallenge) needs --timeout of at least \(waitChallenge + 10) to leave room for the load")
+                reason:
+                    "--wait-challenge \(waitChallenge) needs --timeout of at least \(waitChallenge + 10) to leave room for the load"
+            )
         }
         NavigationReport.run(globals: globals, challengeSeconds: waitChallenge) { try await $0.navigate(to: parsedURL) }
     }

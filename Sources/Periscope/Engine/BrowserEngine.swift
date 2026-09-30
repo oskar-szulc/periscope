@@ -101,17 +101,17 @@ final class BrowserEngine {
     /// awaits to the web content process where one does.
     func observePage() async throws -> PageObservation {
         let script = """
-        (function() {
-            var text = (document.body && document.body.innerText) || '';  // one layout, not two
-            return JSON.stringify({
-                url: location.href,
-                title: document.title || '',
-                textChars: text.replace(/\\s+/g, ' ').trim().length,
-                htmlChars: document.documentElement.outerHTML.length,
-                blockText: text.slice(0, 4000)
-            });
-        })()
-        """
+            (function() {
+                var text = (document.body && document.body.innerText) || '';  // one layout, not two
+                return JSON.stringify({
+                    url: location.href,
+                    title: document.title || '',
+                    textChars: text.replace(/\\s+/g, ' ').trim().length,
+                    htmlChars: document.documentElement.outerHTML.length,
+                    blockText: text.slice(0, 4000)
+                });
+            })()
+            """
         guard let probe: PageProbe = try await runJavaScriptDecoded(script) else {
             return PageObservation(title: nil, textChars: 0, blocked: nil)
         }
@@ -210,7 +210,8 @@ final class BrowserEngine {
     /// `run → String → data → decode` ladder every diagnostics reader used.
     func runJavaScriptDecoded<T: Decodable>(_ script: String) async throws -> T? {
         guard let json = try await runJavaScript(script) as? String,
-              let data = json.data(using: .utf8) else { return nil }
+            let data = json.data(using: .utf8)
+        else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
@@ -292,7 +293,8 @@ final class BrowserEngine {
         var last = ElementProbe(count: 0, actionable: false, reason: nil, candidates: [])
         while true {
             if let probe: ElementProbe = try await runJavaScriptDecoded(
-                ElementResolver.probeScript(selector: selector)) {
+                ElementResolver.probeScript(selector: selector))
+            {
                 last = probe
             }
             if last.count > 0 {
@@ -324,7 +326,8 @@ final class BrowserEngine {
             // reports e.buttons == 0 (read from the physical mouse); libraries
             // that follow down/move/up still see the drag.
             guard mouseIsDown else {
-                throw PeriscopeError.argumentError(reason: "mouse move drags after `mouse down`; for hover use `periscope hover <target>`")
+                throw PeriscopeError.argumentError(
+                    reason: "mouse move drags after `mouse down`; for hover use `periscope hover <target>`")
             }
             windowController.mouse(.leftMouseDragged, x: x, y: y)
         case .click:
@@ -400,13 +403,16 @@ final class BrowserEngine {
     func recordedRequests() async throws -> [RequestItem] {
         var items: [RequestItem] = []
         if let url = currentURL {
-            items.append(RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil, error: nil))
+            items.append(
+                RequestItem(method: "GET", url: url, status: lastStatusCode, kind: "document", durationMs: nil, error: nil))
         }
         if let recorded: [RecordedRequest] = try await runJavaScriptDecoded(
-            FetchQuietMonitor.readRequestsScript) {
+            FetchQuietMonitor.readRequestsScript)
+        {
             items += recorded.map {
-                RequestItem(method: $0.method, url: $0.url, status: $0.status,
-                            kind: $0.kind, durationMs: $0.ms, error: $0.error)
+                RequestItem(
+                    method: $0.method, url: $0.url, status: $0.status,
+                    kind: $0.kind, durationMs: $0.ms, error: $0.error)
             }
         }
         return items
@@ -433,7 +439,8 @@ final class BrowserEngine {
         while true {
             if let until {
                 // Mid-navigation the page may refuse JS; that is "not yet", not a failure.
-                let matches = until.kind == .selector
+                let matches =
+                    until.kind == .selector
                     ? (try? await runJavaScript(ElementResolver.existsScript(selector: until.value))) as? Bool ?? false
                     : false
                 if until.holds(url: page.url?.absoluteString ?? "", title: page.title, matches: matches) { break }
@@ -460,7 +467,8 @@ final class BrowserEngine {
     /// does not see them. Wait for pending images (3s cap) and fonts, then two
     /// animation frames, so the capture follows a paint of what loaded.
     func settleForCapture() async throws {
-        _ = try await runJavaScript("""
+        _ = try await runJavaScript(
+            """
             (async () => {
                 const pending = [...document.images].filter(i => !i.complete)
                     .map(i => new Promise(r => { i.addEventListener('load', r); i.addEventListener('error', r); }));
@@ -537,26 +545,27 @@ final class BrowserEngine {
     /// is stripped; with an explicit selector only scripts/styles are, since the
     /// caller aimed at what they want.
     func readableContent(from selector: String?) async throws -> String {
-        let rootExpr = selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" }
+        let rootExpr =
+            selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" }
             ?? PageSummarizer.mainContentExpr
         let extraStrip = selector == nil ? ", nav, header, footer, aside" : ""
         let js = """
-        (function() {
-            var root = \(rootExpr);
-            if (!root) return null;
-            var clone = root.cloneNode(true);
-            clone.querySelectorAll('script, style, noscript, iframe, svg\(extraStrip)')
-                .forEach(function(el) { el.remove(); });
-            document.body.appendChild(clone);
-            clone.style.position = 'absolute'; clone.style.left = '-99999px';
-            var text = clone.innerText || clone.textContent || '';
-            clone.remove();
-            return text.split('\\n')
-                .map(function(l) { return l.replace(/[ \\t]+/g, ' ').trim(); })
-                .filter(function(l) { return l.length; })
-                .join('\\n');
-        })()
-        """
+            (function() {
+                var root = \(rootExpr);
+                if (!root) return null;
+                var clone = root.cloneNode(true);
+                clone.querySelectorAll('script, style, noscript, iframe, svg\(extraStrip)')
+                    .forEach(function(el) { el.remove(); });
+                document.body.appendChild(clone);
+                clone.style.position = 'absolute'; clone.style.left = '-99999px';
+                var text = clone.innerText || clone.textContent || '';
+                clone.remove();
+                return text.split('\\n')
+                    .map(function(l) { return l.replace(/[ \\t]+/g, ' ').trim(); })
+                    .filter(function(l) { return l.length; })
+                    .join('\\n');
+            })()
+            """
         guard let text = try await runJavaScript(js) as? String else {
             throw PeriscopeError.elementNotFound(selector: selector ?? "body")
         }
@@ -567,8 +576,10 @@ final class BrowserEngine {
     /// turn up, the readable text rides along, so an article or a detail page
     /// still comes back with its content.
     func pageRecords(from: String?, items: String?) async throws -> [String: Any] {
-        guard var records = try await runJavaScript(PageRecords.script(from: from, items: items))
-                as? [String: Any] else {
+        guard
+            var records = try await runJavaScript(PageRecords.script(from: from, items: items))
+                as? [String: Any]
+        else {
             throw PeriscopeError.elementNotFound(selector: from ?? "body")
         }
         if (records["items"] as? [Any])?.isEmpty ?? true {
@@ -582,18 +593,18 @@ final class BrowserEngine {
         let js: String
         if let selector {
             js = """
-            (function() {
-                var el = document.querySelector(\(ElementResolver.jsString(selector)));
-                return el ? el.innerHTML : null;
-            })();
-            """
+                (function() {
+                    var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                    return el ? el.innerHTML : null;
+                })();
+                """
         } else {
             js = """
-            (function() {
-                var el = \(PageSummarizer.mainContentExpr);
-                return el ? el.innerHTML : '';
-            })();
-            """
+                (function() {
+                    var el = \(PageSummarizer.mainContentExpr);
+                    return el ? el.innerHTML : '';
+                })();
+                """
         }
         guard let html = try await runJavaScript(js) as? String else {
             throw PeriscopeError.elementNotFound(selector: selector ?? "body")
@@ -605,11 +616,11 @@ final class BrowserEngine {
         let js: String
         if let selector {
             js = """
-            (function() {
-                var el = document.querySelector(\(ElementResolver.jsString(selector)));
-                return el ? el.outerHTML : null;
-            })();
-            """
+                (function() {
+                    var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                    return el ? el.outerHTML : null;
+                })();
+                """
         } else {
             js = "document.documentElement.outerHTML"
         }
@@ -621,11 +632,11 @@ final class BrowserEngine {
 
     func extractAttribute(selector: String, attribute: String) async throws -> String {
         let js = """
-        (function() {
-            var el = document.querySelector(\(ElementResolver.jsString(selector)));
-            return el ? el.getAttribute(\(ElementResolver.jsString(attribute))) : null;
-        })();
-        """
+            (function() {
+                var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                return el ? el.getAttribute(\(ElementResolver.jsString(attribute))) : null;
+            })();
+            """
         guard let value = try await runJavaScript(js) as? String else {
             throw PeriscopeError.elementNotFound(selector: selector)
         }
@@ -634,10 +645,10 @@ final class BrowserEngine {
 
     func extractLinks() async throws -> [LinkItem] {
         let js = """
-        Array.from(document.querySelectorAll('a[href]')).map(function(a) {
-            return { text: a.textContent.trim(), url: a.href };
-        })
-        """
+            Array.from(document.querySelectorAll('a[href]')).map(function(a) {
+                return { text: a.textContent.trim(), url: a.href };
+            })
+            """
         guard let results = try await runJavaScript(js) as? [[String: Any]] else {
             return []
         }
@@ -646,15 +657,15 @@ final class BrowserEngine {
 
     func extractTable(selector: String) async throws -> String {
         let js = """
-        (function() {
-            var table = document.querySelector(\(ElementResolver.jsString(selector)));
-            if (!table) return null;
-            return Array.from(table.querySelectorAll('tr')).map(function(row) {
-                return Array.from(row.querySelectorAll('td, th'))
-                    .map(function(cell) { return cell.textContent.trim(); });
-            });
-        })();
-        """
+            (function() {
+                var table = document.querySelector(\(ElementResolver.jsString(selector)));
+                if (!table) return null;
+                return Array.from(table.querySelectorAll('tr')).map(function(row) {
+                    return Array.from(row.querySelectorAll('td, th'))
+                        .map(function(cell) { return cell.textContent.trim(); });
+                });
+            })();
+            """
         guard let rows = try await runJavaScript(js) as? [[String]] else {
             throw PeriscopeError.elementNotFound(selector: selector)
         }

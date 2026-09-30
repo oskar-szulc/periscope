@@ -9,8 +9,10 @@ struct PersistedCookie: Codable, Sendable {
     let secure: Bool
     let httpOnly: Bool
 
-    init(name: String, value: String, domain: String, path: String,
-         expires: String?, secure: Bool, httpOnly: Bool) {
+    init(
+        name: String, value: String, domain: String, path: String,
+        expires: String?, secure: Bool, httpOnly: Bool
+    ) {
         self.name = name
         self.value = value
         self.domain = domain
@@ -63,11 +65,11 @@ enum CookieStore {
         let now = Date()
         return cookies.filter { cookie in
             guard let expires = cookie.expires,
-                  let date = isoFormatter.date(from: expires) else {
+                let date = isoFormatter.date(from: expires)
+            else {
                 return true
             }
             return date > now
         }
     }
 }
-

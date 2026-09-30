@@ -22,10 +22,12 @@ final class HiddenWindowController {
     /// and the one fingerprint gap found when Cloudflare stalled periscope.
     static let safariProduct: String = {
         let info = NSDictionary(contentsOfFile: "/Applications/Safari.app/Contents/Info.plist")
-        let version = info?["CFBundleShortVersionString"] as? String ?? {
-            let os = ProcessInfo.processInfo.operatingSystemVersion
-            return "\(os.majorVersion).\(os.minorVersion)"
-        }()
+        let version =
+            info?["CFBundleShortVersionString"] as? String
+            ?? {
+                let os = ProcessInfo.processInfo.operatingSystemVersion
+                return "\(os.majorVersion).\(os.minorVersion)"
+            }()
         return "Version/\(version) Safari/605.1.15"
     }()
 
@@ -36,8 +38,9 @@ final class HiddenWindowController {
         // parsing are counted by `fetchquiet` and logged for `requests`, and
         // console output from the first script onward is kept for `console`.
         for source in [ElementResolver.installScript, FetchQuietMonitor.installScript, ConsoleMonitor.installScript] {
-            configuration.userContentController.addUserScript(WKUserScript(
-                source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            configuration.userContentController.addUserScript(
+                WKUserScript(
+                    source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
         self.dataStore = configuration.websiteDataStore
         self.contentController = configuration.userContentController

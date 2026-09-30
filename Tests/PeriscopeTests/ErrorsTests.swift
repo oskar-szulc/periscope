@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("PeriscopeError")
@@ -7,8 +8,9 @@ struct PeriscopeErrorTests {
     @Test func navigationFailedIncludesURL() {
         let error = PeriscopeError.navigationFailed(
             url: "https://example.com", reason: "Could not connect to the server.")
-        #expect(error.description
-            == "Navigation to https://example.com failed: Could not connect to the server.")
+        #expect(
+            error.description
+                == "Navigation to https://example.com failed: Could not connect to the server.")
     }
 
     @Test func navigationFailedWithoutURLOmitsEmptyGap() {

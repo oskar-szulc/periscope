@@ -22,14 +22,16 @@ enum WaitStrategy: Sendable, Equatable {
         case "fetchquiet": return .fetchquiet(maxMs: nil)
         default:
             if string.hasPrefix("fetchquiet:"),
-               let ms = Int(string.dropFirst("fetchquiet:".count)) {
+                let ms = Int(string.dropFirst("fetchquiet:".count))
+            {
                 return .fetchquiet(maxMs: ms)
             }
             if string.hasPrefix("selector:") {
                 return .selector(String(string.dropFirst("selector:".count)))
             }
             if string.hasPrefix("time:"),
-               let ms = Int(string.dropFirst("time:".count)) {
+                let ms = Int(string.dropFirst("time:".count))
+            {
                 return .time(ms)
             }
             return nil

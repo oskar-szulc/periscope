@@ -1,5 +1,5 @@
-import Foundation
 import AppKit
+import Foundation
 
 enum CommandRunner {
     typealias CommandBlock = @MainActor @Sendable (BrowserEngine) async throws -> CommandResult
@@ -87,7 +87,8 @@ enum CommandRunner {
                 do {
                     if !globals.noSession {
                         if let warning = try await SessionRestore.restore(
-                            engine: engine, session: globals.session) {
+                            engine: engine, session: globals.session)
+                        {
                             FileHandle.standardError.write(Data((warning + "\n").utf8))
                         }
                     }
@@ -111,9 +112,11 @@ enum CommandRunner {
                     await MainActor.run { engine.close() }
                     Foundation.exit(error.exitCode)
                 } catch {
-                    emit(ErrorPayload(code: "INTERNAL",
-                                      message: error.localizedDescription, exitCode: 1),
-                         formatter: formatter, globals: globals)
+                    emit(
+                        ErrorPayload(
+                            code: "INTERNAL",
+                            message: error.localizedDescription, exitCode: 1),
+                        formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(1)
                 }

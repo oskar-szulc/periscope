@@ -17,7 +17,8 @@ enum InteractionReport {
     }
 }
 
-let targetHelp = "Target: CSS selector, or text:<visible text>, label:<label>, placeholder:<text>, role:<role> [name=<text>], or @N from the last `state`"
+let targetHelp =
+    "Target: CSS selector, or text:<visible text>, label:<label>, placeholder:<text>, role:<role> [name=<text>], or @N from the last `state`"
 
 struct Click: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Click an element")
@@ -178,8 +179,9 @@ struct TypeText: ParsableCommand {
         let (globals, selector, text, delayMs, submit) = (globals, selector, text, delayMs, submit)
         CommandRunner.run(globals: globals) { engine in
             let before = engine.currentURL
-            try await engine.type(selector: selector, text: submit ? text + "\r" : text,
-                                  strict: globals.strict, delayMs: delayMs)
+            try await engine.type(
+                selector: selector, text: submit ? text + "\r" : text,
+                strict: globals.strict, delayMs: delayMs)
             return try await InteractionReport.after(
                 engine: engine, globals: globals, urlBefore: before, otherwise: "Typed into \(selector)")
         }

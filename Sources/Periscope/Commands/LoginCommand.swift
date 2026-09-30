@@ -1,6 +1,6 @@
+import AppKit
 import ArgumentParser
 import Foundation
-import AppKit
 
 struct Login: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -12,7 +12,11 @@ struct Login: ParsableCommand {
     @Argument(help: "URL to navigate to for login")
     var url: String
 
-    @Option(name: .long, help: "When login is done: selector:<css>, url:<text> or title:<text>; ! before the colon inverts (title!:Just a moment). Default: the URL path changes.")
+    @Option(
+        name: .long,
+        help:
+            "When login is done: selector:<css>, url:<text> or title:<text>; ! before the colon inverts (title!:Just a moment). Default: the URL path changes."
+    )
     var until: String?
 
     func run() throws {
@@ -103,8 +107,10 @@ struct Login: ParsableCommand {
             }
         } catch PeriscopeError.timeout {
             let waited = untilCondition.map { "--until \($0) never held" } ?? "the URL path never changed"
-            FileHandle.standardError.write(Data(
-                "\(waited). Page at timeout: \(engine.locationDescription). Pass --timeout <s> for longer, 0 to wait until Ctrl-C.\n".utf8))
+            FileHandle.standardError.write(
+                Data(
+                    "\(waited). Page at timeout: \(engine.locationDescription). Pass --timeout <s> for longer, 0 to wait until Ctrl-C.\n"
+                        .utf8))
             throw PeriscopeError.timeout(seconds: timeoutSeconds)
         }
 
@@ -118,8 +124,9 @@ struct Login: ParsableCommand {
                 viewport: viewportStr, fallbackURL: urlString)
         }
 
-        print(formatter.format(
-            .plain("Session '\(sessionName)' saved. URL: \(engine.currentURL ?? urlString)")))
+        print(
+            formatter.format(
+                .plain("Session '\(sessionName)' saved. URL: \(engine.currentURL ?? urlString)")))
         engine.close()
     }
 }

@@ -37,16 +37,19 @@ struct State: ParsableCommand {
         let json = globals.json
 
         CommandRunner.run(globals: globals) { engine in
-            guard let decoded: PageStateData = try await engine.runJavaScriptDecoded(
-                PageSummarizer.extractScript) else {
+            guard
+                let decoded: PageStateData = try await engine.runJavaScriptDecoded(
+                    PageSummarizer.extractScript)
+            else {
                 throw PeriscopeError.javaScriptError(reason: "Failed to extract page state")
             }
 
             var state = decoded
             // The block markers live in the first few hundred chars of the text
             // `state` already fetched, so classify here instead of a second probe.
-            state.blocked = BlockDetector.classify(
-                url: state.url, title: state.title, text: state.text)?.rawValue
+            state.blocked =
+                BlockDetector.classify(
+                    url: state.url, title: state.title, text: state.text)?.rawValue
 
             if actionsOnly {
                 state.text = ""
@@ -63,7 +66,8 @@ struct State: ParsableCommand {
                 do {
                     try rendered.write(toFile: outPath, atomically: true, encoding: .utf8)
                 } catch {
-                    throw PeriscopeError.argumentError(reason: "Cannot write \(outPath): \((error as NSError).localizedDescription)")
+                    throw PeriscopeError.argumentError(
+                        reason: "Cannot write \(outPath): \((error as NSError).localizedDescription)")
                 }
                 return .plain("State written to \(outPath) (\(state.elements.count) actions, \(rendered.count) chars)")
             }

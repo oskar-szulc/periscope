@@ -137,10 +137,12 @@ struct HTMLToMarkdown: Sendable {
 
     /// Converts <table> blocks to markdown table syntax.
     private func convertTables(in html: String) -> String {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"<table[^>]*>([\s\S]*?)</table>"#,
-            options: .caseInsensitive
-        ) else { return html }
+        guard
+            let regex = try? NSRegularExpression(
+                pattern: #"<table[^>]*>([\s\S]*?)</table>"#,
+                options: .caseInsensitive
+            )
+        else { return html }
 
         let nsHtml = html as NSString
         let range = NSRange(location: 0, length: nsHtml.length)
@@ -160,10 +162,12 @@ struct HTMLToMarkdown: Sendable {
     /// Converts a single <table>...</table> block to markdown.
     private func tableToMarkdown(_ tableHtml: String) -> String {
         // Extract rows
-        guard let rowRegex = try? NSRegularExpression(
-            pattern: #"<tr[^>]*>([\s\S]*?)</tr>"#,
-            options: .caseInsensitive
-        ) else { return tableHtml }
+        guard
+            let rowRegex = try? NSRegularExpression(
+                pattern: #"<tr[^>]*>([\s\S]*?)</tr>"#,
+                options: .caseInsensitive
+            )
+        else { return tableHtml }
 
         let nsTable = tableHtml as NSString
         let rowRange = NSRange(location: 0, length: nsTable.length)
@@ -210,10 +214,12 @@ struct HTMLToMarkdown: Sendable {
 
     /// Extracts cell contents for the given tag (th or td) from a row string.
     private func extractCells(tag: String, from rowHtml: String) -> [String] {
-        guard let cellRegex = try? NSRegularExpression(
-            pattern: "<\(tag)[^>]*>([\\s\\S]*?)</\(tag)>",
-            options: .caseInsensitive
-        ) else { return [] }
+        guard
+            let cellRegex = try? NSRegularExpression(
+                pattern: "<\(tag)[^>]*>([\\s\\S]*?)</\(tag)>",
+                options: .caseInsensitive
+            )
+        else { return [] }
 
         let nsRow = rowHtml as NSString
         let range = NSRange(location: 0, length: nsRow.length)
@@ -233,29 +239,35 @@ struct HTMLToMarkdown: Sendable {
 
     /// Converts <ul>...</ul> blocks to markdown unordered lists.
     private func convertUnorderedLists(in html: String) -> String {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"<ul[^>]*>([\s\S]*?)</ul>"#,
-            options: .caseInsensitive
-        ) else { return html }
+        guard
+            let regex = try? NSRegularExpression(
+                pattern: #"<ul[^>]*>([\s\S]*?)</ul>"#,
+                options: .caseInsensitive
+            )
+        else { return html }
 
         return replaceListMatches(regex: regex, in: html, ordered: false)
     }
 
     /// Converts <ol>...</ol> blocks to markdown ordered lists.
     private func convertOrderedLists(in html: String) -> String {
-        guard let regex = try? NSRegularExpression(
-            pattern: #"<ol[^>]*>([\s\S]*?)</ol>"#,
-            options: .caseInsensitive
-        ) else { return html }
+        guard
+            let regex = try? NSRegularExpression(
+                pattern: #"<ol[^>]*>([\s\S]*?)</ol>"#,
+                options: .caseInsensitive
+            )
+        else { return html }
 
         return replaceListMatches(regex: regex, in: html, ordered: true)
     }
 
     private func replaceListMatches(regex: NSRegularExpression, in html: String, ordered: Bool) -> String {
-        guard let liRegex = try? NSRegularExpression(
-            pattern: #"<li[^>]*>([\s\S]*?)</li>"#,
-            options: .caseInsensitive
-        ) else { return html }
+        guard
+            let liRegex = try? NSRegularExpression(
+                pattern: #"<li[^>]*>([\s\S]*?)</li>"#,
+                options: .caseInsensitive
+            )
+        else { return html }
 
         let nsHtml = html as NSString
         let range = NSRange(location: 0, length: nsHtml.length)
@@ -321,7 +333,7 @@ struct HTMLToMarkdown: Sendable {
             of: #"&#(\d+);"#,
             with: { (match: String) -> String in
                 // Extract the number from the match
-                let inner = match.dropFirst(2).dropLast(1) // remove &# and ;
+                let inner = match.dropFirst(2).dropLast(1)  // remove &# and ;
                 if let codePoint = UInt32(inner), let scalar = Unicode.Scalar(codePoint) {
                     return String(scalar)
                 }

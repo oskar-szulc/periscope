@@ -24,9 +24,12 @@ struct CookieSetCmd: ParsableCommand {
             guard let host = domain ?? engine.currentURL.flatMap({ URL(string: $0)?.host }) else {
                 throw PeriscopeError.argumentError(reason: "No page loaded; pass --domain")
             }
-            guard let cookie = PersistedCookie(
-                name: name, value: value, domain: host, path: path,
-                expires: nil, secure: secure, httpOnly: false).httpCookie else {
+            guard
+                let cookie = PersistedCookie(
+                    name: name, value: value, domain: host, path: path,
+                    expires: nil, secure: secure, httpOnly: false
+                ).httpCookie
+            else {
                 throw PeriscopeError.argumentError(reason: "Invalid cookie")
             }
             await engine.setCookies([cookie])

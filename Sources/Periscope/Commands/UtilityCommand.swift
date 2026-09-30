@@ -22,15 +22,19 @@ struct Elements: ParsableCommand {
     @Argument(help: ArgumentHelp(stringLiteral: targetHelp)) var selector: String
     func run() throws {
         CommandRunner.run(globals: globals) { engine in
-            guard let results = try await engine.runJavaScript(
-                ElementResolver.elementsScript(selector: selector)) as? [[String: Any]] else {
+            guard
+                let results = try await engine.runJavaScript(
+                    ElementResolver.elementsScript(selector: selector)) as? [[String: Any]]
+            else {
                 return .elements([])
             }
-            return .elements(results.map {
-                ElementItem(index: $0["index"] as? Int ?? 0, tag: $0["tag"] as? String ?? "",
-                    id: $0["id"] as? String, classes: $0["classes"] as? [String] ?? [],
-                    text: $0["text"] as? String ?? "")
-            })
+            return .elements(
+                results.map {
+                    ElementItem(
+                        index: $0["index"] as? Int ?? 0, tag: $0["tag"] as? String ?? "",
+                        id: $0["id"] as? String, classes: $0["classes"] as? [String] ?? [],
+                        text: $0["text"] as? String ?? "")
+                })
         }
     }
 }

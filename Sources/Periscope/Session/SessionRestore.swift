@@ -29,7 +29,8 @@ enum SessionRestore {
         }
 
         guard let state = try manager.loadState(session: session),
-              let url = URL(string: state.url) else { return nil }
+            let url = URL(string: state.url)
+        else { return nil }
 
         do {
             _ = try await engine.navigate(to: url)
@@ -60,8 +61,9 @@ enum SessionRestore {
             session: session)
 
         if let json = try await engine.runJavaScript(StorageManager.extractionScript()) as? String,
-           let data = json.data(using: .utf8),
-           let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+            let data = json.data(using: .utf8),
+            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        {
             let origin = URL(string: url).map { "\($0.scheme ?? "https")://\($0.host ?? "")" } ?? url
             try manager.saveStorage(PersistedStorage(origin: origin, localStorage: dict), session: session)
         }

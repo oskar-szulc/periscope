@@ -19,7 +19,8 @@ struct GlobalOptions: ParsableArguments {
     @Option(name: .long, help: "Override user agent; sticks for a live session")
     var userAgent: String?
 
-    @Option(name: .long, help: "lean skips images, media and fonts for faster loads; full restores them. Sticks for a live session")
+    @Option(
+        name: .long, help: "lean skips images, media and fonts for faster loads; full restores them. Sticks for a live session")
     var resourceMode: ResourceMode?
 
     @Option(name: .long, help: "Wait strategy: none, load, fetchquiet, fetchquiet:<maxMs>, selector:<css>, time:<ms>")

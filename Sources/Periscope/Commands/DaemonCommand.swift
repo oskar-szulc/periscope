@@ -1,6 +1,6 @@
+import AppKit
 import ArgumentParser
 import Foundation
-import AppKit
 
 struct Serve: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -68,8 +68,9 @@ struct DaemonStatus: ParsableCommand {
             return
         }
 
-        print("daemon: running (pid \(status.pid), up \(format(status.uptimeSeconds)), "
-              + "protocol \(status.protocolVersion))")
+        print(
+            "daemon: running (pid \(status.pid), up \(format(status.uptimeSeconds)), "
+                + "protocol \(status.protocolVersion))")
         if status.sessions.isEmpty {
             print("sessions: none live")
         } else {
@@ -96,8 +97,9 @@ struct DaemonStop: ParsableCommand {
             print("daemon: not running")
             return
         }
-        print("daemon: stopping (pid \(status.pid)), "
-              + "\(status.sessions.count) session(s) flushed to disk")
+        print(
+            "daemon: stopping (pid \(status.pid)), "
+                + "\(status.sessions.count) session(s) flushed to disk")
     }
 }
 

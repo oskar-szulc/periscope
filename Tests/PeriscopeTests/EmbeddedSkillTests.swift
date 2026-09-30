@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("embedded skill")
@@ -11,7 +12,11 @@ struct EmbeddedSkillTests {
             .appendingPathComponent("skill")
         let onDisk = try FileManager.default.subpathsOfDirectory(atPath: skill.path)
             .filter { !$0.hasSuffix(".DS_Store") }
-            .filter { var dir: ObjCBool = false; FileManager.default.fileExists(atPath: skill.appendingPathComponent($0).path, isDirectory: &dir); return !dir.boolValue }
+            .filter {
+                var dir: ObjCBool = false;
+                FileManager.default.fileExists(atPath: skill.appendingPathComponent($0).path, isDirectory: &dir);
+                return !dir.boolValue
+            }
         #expect(Set(onDisk) == Set(EmbeddedSkill.files.map(\.path)), "run scripts/embed-skill.sh")
         for file in EmbeddedSkill.files {
             let actual = try String(contentsOf: skill.appendingPathComponent(file.path), encoding: .utf8)

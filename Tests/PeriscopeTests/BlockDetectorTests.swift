@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("BlockDetector")
@@ -16,7 +17,9 @@ struct BlockDetectorTests {
         let kind = BlockDetector.classify(
             url: "https://www.google.com/search?q=x",
             title: "",
-            text: "Our systems have detected unusual traffic from your computer network. This page checks to see if it's really you")
+            text:
+                "Our systems have detected unusual traffic from your computer network. This page checks to see if it's really you"
+        )
         #expect(kind == .googleCaptcha)
     }
 
@@ -32,7 +35,9 @@ struct BlockDetectorTests {
         let kind = BlockDetector.classify(
             url: "https://html.duckduckgo.com/html/?q=x",
             title: "DuckDuckGo",
-            text: "Unfortunately, bots use DuckDuckGo too. Please complete the following challenge to confirm this search was made by a human.")
+            text:
+                "Unfortunately, bots use DuckDuckGo too. Please complete the following challenge to confirm this search was made by a human."
+        )
         #expect(kind == .duckduckgoChallenge)
     }
 
@@ -65,8 +70,9 @@ struct BlockedErrorTests {
         let error = PeriscopeError.blocked(kind: .googleCaptcha, url: "https://www.google.com/sorry/index")
         #expect(error.exitCode == 5)
         #expect(error.wireCode == "BLOCKED")
-        #expect(error.description
-            == "Blocked by google-captcha at https://www.google.com/sorry/index")
+        #expect(
+            error.description
+                == "Blocked by google-captcha at https://www.google.com/sorry/index")
     }
 
     @Test func blockedPayloadCarriesURL() {

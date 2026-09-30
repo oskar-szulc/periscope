@@ -1,4 +1,5 @@
 import Testing
+
 @testable import Periscope
 
 @Suite("HTMLToMarkdown")
@@ -54,11 +55,11 @@ struct HTMLToMarkdownTests {
 
     @Test func table() {
         let html = """
-        <table>
-        <tr><th>Name</th><th>Age</th></tr>
-        <tr><td>Alice</td><td>30</td></tr>
-        </table>
-        """
+            <table>
+            <tr><th>Name</th><th>Age</th></tr>
+            <tr><td>Alice</td><td>30</td></tr>
+            </table>
+            """
         let expected = "| Name | Age |\n| --- | --- |\n| Alice | 30 |"
         #expect(converter.convert(html) == expected)
     }

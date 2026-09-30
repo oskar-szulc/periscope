@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("PageState formatting")
@@ -23,10 +24,12 @@ struct StateFormattingTests {
     }
 
     @Test func actionsAreColumnAlignedForReadingSelectorsOff() {
-        let output = TextFormatter().format(.state(state(elements: [
-            PageStateElement(selector: "#user", tag: "input", type: "text"),
-            PageStateElement(selector: "#submit-button", tag: "button", text: "Go"),
-        ])))
+        let output = TextFormatter().format(
+            .state(
+                state(elements: [
+                    PageStateElement(selector: "#user", tag: "input", type: "text"),
+                    PageStateElement(selector: "#submit-button", tag: "button", text: "Go"),
+                ])))
         #expect(output.contains("Actions (2):"))
         // The short selector is padded to the long one so the columns line up.
         #expect(output.contains("  #user           input[text]"))
@@ -34,25 +37,31 @@ struct StateFormattingTests {
     }
 
     @Test func actionsLeadWithTheirAtIndex() {
-        let output = TextFormatter().format(.state(state(elements: [
-            PageStateElement(index: 12, selector: "#go", tag: "button", text: "Go"),
-        ])))
+        let output = TextFormatter().format(
+            .state(
+                state(elements: [
+                    PageStateElement(index: 12, selector: "#go", tag: "button", text: "Go")
+                ])))
         #expect(output.contains("  @12  #go  button"))
     }
 
     @Test func disabledAndCheckedAreCalledOut() {
-        let output = TextFormatter().format(.state(state(elements: [
-            PageStateElement(selector: "#a", tag: "button", disabled: true),
-            PageStateElement(selector: "#b", tag: "input", type: "checkbox", checked: true),
-        ])))
+        let output = TextFormatter().format(
+            .state(
+                state(elements: [
+                    PageStateElement(selector: "#a", tag: "button", disabled: true),
+                    PageStateElement(selector: "#b", tag: "input", type: "checkbox", checked: true),
+                ])))
         #expect(output.contains("DISABLED"))
         #expect(output.contains("checked"))
     }
 
     @Test func labelIsNotRepeatedAsText() {
-        let output = TextFormatter().format(.state(state(elements: [
-            PageStateElement(selector: "#a", tag: "input", label: "Email", text: "Email"),
-        ])))
+        let output = TextFormatter().format(
+            .state(
+                state(elements: [
+                    PageStateElement(selector: "#a", tag: "input", label: "Email", text: "Email")
+                ])))
         #expect(output.contains("label=\"Email\""))
         // Same string twice on one line would be noise in an agent's context.
         #expect(!output.contains("label=\"Email\" \"Email\""))
@@ -70,10 +79,12 @@ struct StateFormattingTests {
     }
 
     @Test func headingsAreIndentedByLevel() {
-        let output = TextFormatter().format(.state(state(headings: [
-            PageStateHeading(level: 1, text: "Top"),
-            PageStateHeading(level: 3, text: "Deep"),
-        ])))
+        let output = TextFormatter().format(
+            .state(
+                state(headings: [
+                    PageStateHeading(level: 1, text: "Top"),
+                    PageStateHeading(level: 3, text: "Deep"),
+                ])))
         #expect(output.contains("\n  Top"))
         #expect(output.contains("\n      Deep"))
     }

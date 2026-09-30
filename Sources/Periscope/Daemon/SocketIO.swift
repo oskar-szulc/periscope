@@ -33,7 +33,8 @@ enum SocketIO {
     ///   probe does not.
     static func connect(to path: String, clearIfDead: Bool = false) -> Int32? {
         guard FileManager.default.fileExists(atPath: path),
-              var addr = address(for: path) else { return nil }
+            var addr = address(for: path)
+        else { return nil }
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }

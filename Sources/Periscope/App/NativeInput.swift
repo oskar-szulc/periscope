@@ -11,19 +11,23 @@ extension HiddenWindowController {
     }
 
     func mouse(_ type: NSEvent.EventType, x: Double, y: Double) {
-        guard let event = NSEvent.mouseEvent(
-            with: type, location: windowPoint(x: x, y: y), modifierFlags: [],
-            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
-            context: nil, eventNumber: 0, clickCount: 1,
-            pressure: type == .leftMouseDown || type == .leftMouseDragged ? 1 : 0)
+        guard
+            let event = NSEvent.mouseEvent(
+                with: type, location: windowPoint(x: x, y: y), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1,
+                pressure: type == .leftMouseDown || type == .leftMouseDragged ? 1 : 0)
         else { return }
         window.sendEvent(event)
     }
 
     func scrollWheel(x: Double, y: Double, dx: Double, dy: Double) {
         // Wheel deltas point the other way from scroll offsets.
-        guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
-                               wheel1: Int32(-dy), wheel2: Int32(-dx), wheel3: 0) else { return }
+        guard
+            let cg = CGEvent(
+                scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2,
+                wheel1: Int32(-dy), wheel2: Int32(-dx), wheel3: 0)
+        else { return }
         // An NSEvent made from a CGEvent has no window, so its locationInWindow
         // is the CG location flipped into screen space, and sendEvent hit-tests
         // that as a window point: aim the flip at the window point itself.
@@ -43,7 +47,8 @@ extension HiddenWindowController {
                 with: type, location: .zero, modifierFlags: shift ? .shift : [],
                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
                 context: nil, characters: text, charactersIgnoringModifiers: text,
-                isARepeat: false, keyCode: code) {
+                isARepeat: false, keyCode: code)
+            {
                 window.sendEvent(event)
             }
         }

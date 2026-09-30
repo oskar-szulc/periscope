@@ -1,6 +1,6 @@
-import Foundation
-import ArgumentParser
 import AppKit
+import ArgumentParser
+import Foundation
 
 /// Accepts commands on a unix socket and runs them against live sessions.
 ///
@@ -26,8 +26,10 @@ final class PeriscopeDaemon: @unchecked Sendable {
     private let startedAt = Date()
     private let activityLock = NSLock()
 
-    init(capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60,
-         idleExit: TimeInterval = 10 * 60) {
+    init(
+        capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60,
+        idleExit: TimeInterval = 10 * 60
+    ) {
         self.registry = SessionRegistry(capacity: capacity, idleTimeout: idleTimeout)
         self.idleExit = idleExit
     }
@@ -143,10 +145,11 @@ final class PeriscopeDaemon: @unchecked Sendable {
         do {
             response = await execute(try JSONDecoder().decode(Request.self, from: payload))
         } catch {
-            response = .failure(ErrorPayload(
-                code: "BAD_REQUEST",
-                message: "could not decode request: \(error)",
-                exitCode: 4))
+            response = .failure(
+                ErrorPayload(
+                    code: "BAD_REQUEST",
+                    message: "could not decode request: \(error)",
+                    exitCode: 4))
         }
 
         if let data = try? JSONEncoder().encode(response) {
@@ -162,11 +165,12 @@ final class PeriscopeDaemon: @unchecked Sendable {
                 await self.shutdown()
                 await MainActor.run { NSApp.terminate(nil) }
             }
-            return .failure(ErrorPayload(
-                code: "PROTOCOL_MISMATCH",
-                message: "daemon speaks protocol \(periscopeProtocolVersion), "
-                    + "client speaks \(request.protocolVersion)",
-                exitCode: 4))
+            return .failure(
+                ErrorPayload(
+                    code: "PROTOCOL_MISMATCH",
+                    message: "daemon speaks protocol \(periscopeProtocolVersion), "
+                        + "client speaks \(request.protocolVersion)",
+                    exitCode: 4))
         }
 
         if let verb = request.control {
@@ -182,14 +186,16 @@ final class PeriscopeDaemon: @unchecked Sendable {
         } catch let error as PeriscopeError {
             return .failure(ErrorPayload(error))
         } catch {
-            return .failure(ErrorPayload(
-                code: "ARGUMENT_ERROR", message: "\(error)", exitCode: 4))
+            return .failure(
+                ErrorPayload(
+                    code: "ARGUMENT_ERROR", message: "\(error)", exitCode: 4))
         }
 
         guard let options = request.options else {
-            return .failure(ErrorPayload(
-                code: "BAD_REQUEST", message: "command request carries no options",
-                exitCode: 4))
+            return .failure(
+                ErrorPayload(
+                    code: "BAD_REQUEST", message: "command request carries no options",
+                    exitCode: 4))
         }
         let session: LiveSession
         if options.noSession {
@@ -212,7 +218,9 @@ final class PeriscopeDaemon: @unchecked Sendable {
                 warnings.append("Page at timeout: \(await session.locationDescription())")
                 if !options.noSession {
                     await registry.discard(session)
-                    warnings.append("Session '\(options.session)' was reset so the next command does not wait on this one; it restarts from its last saved state, so navigate again before reading.")
+                    warnings.append(
+                        "Session '\(options.session)' was reset so the next command does not wait on this one; it restarts from its last saved state, so navigate again before reading."
+                    )
                 }
             }
             response = .failure(ErrorPayload(error), warnings: warnings)

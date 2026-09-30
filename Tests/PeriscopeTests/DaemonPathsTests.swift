@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 /// Serialized: both tests set PERISCOPE_DIR, which is process-wide.

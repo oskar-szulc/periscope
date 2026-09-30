@@ -40,6 +40,9 @@ struct UntilCondition: Equatable, CustomStringConvertible {
     var description: String { "\(kind.rawValue)\(negated ? "!" : ""):\(value)" }
 
     private static func invalid(_ raw: String) -> PeriscopeError {
-        .argumentError(reason: "Invalid --until '\(raw)'. Use selector:<css>, url:<text> or title:<text>, with ! before the colon to invert (title!:Just a moment)")
+        .argumentError(
+            reason:
+                "Invalid --until '\(raw)'. Use selector:<css>, url:<text> or title:<text>, with ! before the colon to invert (title!:Just a moment)"
+        )
     }
 }

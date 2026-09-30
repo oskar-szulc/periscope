@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("Cookie jar round trip")
@@ -8,10 +9,11 @@ struct CookieJarTests {
     private let soon = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 30 * 86400).rounded(.down))
 
     @Test func httpCookieBecomesPersistedWithAllAttributes() throws {
-        let cookie = try #require(HTTPCookie(properties: [
-            .name: "sid", .value: "abc", .domain: ".example.com", .path: "/app",
-            .secure: "TRUE", .expires: soon,
-        ]))
+        let cookie = try #require(
+            HTTPCookie(properties: [
+                .name: "sid", .value: "abc", .domain: ".example.com", .path: "/app",
+                .secure: "TRUE", .expires: soon,
+            ]))
         let persisted = PersistedCookie(cookie)
         #expect(persisted.name == "sid")
         #expect(persisted.domain == ".example.com")
@@ -21,9 +23,10 @@ struct CookieJarTests {
     }
 
     @Test func sessionCookieKeepsNilExpiryAndRoundTrips() throws {
-        let cookie = try #require(HTTPCookie(properties: [
-            .name: "probe", .value: "ps1", .domain: "httpbin.org", .path: "/",
-        ]))
+        let cookie = try #require(
+            HTTPCookie(properties: [
+                .name: "probe", .value: "ps1", .domain: "httpbin.org", .path: "/",
+            ]))
         let persisted = PersistedCookie(cookie)
         #expect(persisted.expires == nil)
         let back = try #require(persisted.httpCookie)

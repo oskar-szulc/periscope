@@ -41,9 +41,13 @@ struct TextFormatter: OutputFormatting {
             if items.isEmpty { return "No requests recorded." }
             return items.map { item in
                 let outcome: String
-                if let status = item.status { outcome = String(status) }
-                else if item.error != nil { outcome = "failed" }
-                else { outcome = "pending" }
+                if let status = item.status {
+                    outcome = String(status)
+                } else if item.error != nil {
+                    outcome = "failed"
+                } else {
+                    outcome = "pending"
+                }
                 var tail = item.kind
                 if let ms = item.durationMs { tail += ", \(ms)ms" }
                 if let error = item.error { tail += ": \(error)" }
@@ -89,8 +93,9 @@ struct TextFormatter: OutputFormatting {
             lines.append("")
             lines.append("Headings:")
             for heading in state.headings {
-                lines.append("  " + String(repeating: "  ", count: max(heading.level - 1, 0))
-                    + heading.text)
+                lines.append(
+                    "  " + String(repeating: "  ", count: max(heading.level - 1, 0))
+                        + heading.text)
             }
         }
 
@@ -128,8 +133,9 @@ struct TextFormatter: OutputFormatting {
             let padded = element.selector.padding(
                 toLength: max(width, element.selector.count), withPad: " ", startingAt: 0)
             let index = element.index.map { "@\($0)".padding(toLength: 4, withPad: " ", startingAt: 0) + " " } ?? ""
-            lines.append("  \(index)\(padded)  \(descriptor)"
-                + (notes.isEmpty ? "" : "  " + notes.joined(separator: " ")))
+            lines.append(
+                "  \(index)\(padded)  \(descriptor)"
+                    + (notes.isEmpty ? "" : "  " + notes.joined(separator: " ")))
         }
         if let omitted = state.omitted {
             lines.append("  ... \(omitted) more; use --all or --match <regex>")

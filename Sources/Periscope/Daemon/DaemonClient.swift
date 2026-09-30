@@ -28,7 +28,8 @@ enum DaemonClient {
             !FileManager.default.fileExists(atPath: DaemonPaths.socket.path)
         }
         guard let retry = roundTrip(request(for: globals)),
-              retry.error?.code != "PROTOCOL_MISMATCH" else { return nil }
+            retry.error?.code != "PROTOCOL_MISMATCH"
+        else { return nil }
         return retry
     }
 
@@ -55,8 +56,8 @@ enum DaemonClient {
 
     private static func exchange(fd: Int32, request: Request) -> Response? {
         guard let encoded = try? JSONEncoder().encode(request),
-              SocketIO.writeAll(fd: fd, data: encoded + Data("\n".utf8)),
-              let payload = SocketIO.readMessage(fd: fd, maxBytes: maxResponseBytes)
+            SocketIO.writeAll(fd: fd, data: encoded + Data("\n".utf8)),
+            let payload = SocketIO.readMessage(fd: fd, maxBytes: maxResponseBytes)
         else { return nil }
         return try? JSONDecoder().decode(Response.self, from: payload)
     }

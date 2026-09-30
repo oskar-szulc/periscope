@@ -51,8 +51,10 @@ struct Query: ParsableCommand {
 
         CommandRunner.run(globals: globals) { engine in
             // Extract page summary
-            guard let json = try await engine.runJavaScript(
-                PageSummarizer.extractScript) as? String else {
+            guard
+                let json = try await engine.runJavaScript(
+                    PageSummarizer.extractScript) as? String
+            else {
                 throw PeriscopeError.javaScriptError(reason: "Failed to extract page summary")
             }
 
@@ -72,48 +74,53 @@ struct Query: ParsableCommand {
 
     /// Answer a freeform question about the page.
     private static func answerQuestion(json: String, question: String) async throws -> CommandResult {
-        let session = LanguageModelSession(instructions: """
-            You answer questions about web pages. You receive a JSON summary of the \
-            page containing its title, URL, text content, and interactive elements. \
-            Answer concisely based only on the page content. If the answer isn't in \
-            the content, say so.
-            """)
+        let session = LanguageModelSession(
+            instructions: """
+                You answer questions about web pages. You receive a JSON summary of the \
+                page containing its title, URL, text content, and interactive elements. \
+                Answer concisely based only on the page content. If the answer isn't in \
+                the content, say so.
+                """)
 
-        let response = try await session.respond(to: """
-            Page data:
-            \(json)
+        let response = try await session.respond(
+            to: """
+                Page data:
+                \(json)
 
-            Question: \(question)
-            """)
+                Question: \(question)
+                """)
         return .extract(content: response.content)
     }
 
     /// Find an interactive element matching a natural language description.
     private static func findElement(json: String, question: String, asJson: Bool) async throws -> CommandResult {
-        let session = LanguageModelSession(instructions: """
-            You find interactive elements on web pages. You receive a JSON summary \
-            containing the page's elements with their tags, attributes, text, and \
-            selectors. Find the element that best matches the user's description. \
-            Use the selector from the elements list when possible. Prefer IDs, then \
-            name attributes, then aria-labels for selectors.
-            """)
+        let session = LanguageModelSession(
+            instructions: """
+                You find interactive elements on web pages. You receive a JSON summary \
+                containing the page's elements with their tags, attributes, text, and \
+                selectors. Find the element that best matches the user's description. \
+                Use the selector from the elements list when possible. Prefer IDs, then \
+                name attributes, then aria-labels for selectors.
+                """)
 
-        let response = try await session.respond(to: """
-            Page elements:
-            \(json)
+        let response = try await session.respond(
+            to: """
+                Page elements:
+                \(json)
 
-            Find: \(question)
-            """, generating: FoundElement.self)
+                Find: \(question)
+                """, generating: FoundElement.self)
 
         let el = response.content
         if asJson {
-            let data = try JSONSerialization.data(withJSONObject: [
-                "ok": true,
-                "selector": el.selector,
-                "description": el.description,
-                "type": el.elementType,
-                "confidence": el.confidence,
-            ] as [String: Any], options: [.sortedKeys])
+            let data = try JSONSerialization.data(
+                withJSONObject: [
+                    "ok": true,
+                    "selector": el.selector,
+                    "description": el.description,
+                    "type": el.elementType,
+                    "confidence": el.confidence,
+                ] as [String: Any], options: [.sortedKeys])
             return .plain(String(data: data, encoding: .utf8) ?? "{}")
         }
         return .plain("\(el.selector)  (\(el.elementType): \(el.description)) [\(el.confidence)]")

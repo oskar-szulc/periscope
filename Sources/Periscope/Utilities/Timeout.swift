@@ -33,8 +33,10 @@ private final class Race<T: Sendable>: Sendable {
     }
     private let state = Mutex(State())
 
-    func start(_ continuation: CheckedContinuation<T, Error>, seconds: Int,
-               operation: @escaping @Sendable () async throws -> T) {
+    func start(
+        _ continuation: CheckedContinuation<T, Error>, seconds: Int,
+        operation: @escaping @Sendable () async throws -> T
+    ) {
         // One lock for the whole setup: a task that finishes at once waits
         // here briefly instead of racing a half-built state.
         state.withLock { s in
@@ -42,8 +44,7 @@ private final class Race<T: Sendable>: Sendable {
             s.continuation = continuation
             s.tasks = [
                 Task {
-                    do { self.finish(.success(try await operation())) }
-                    catch { self.finish(.failure(error)) }
+                    do { self.finish(.success(try await operation())) } catch { self.finish(.failure(error)) }
                 },
                 Task {
                     try? await Task.sleep(for: .seconds(seconds))

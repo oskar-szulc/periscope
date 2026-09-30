@@ -13,7 +13,9 @@ struct InstallSkill: ParsableCommand {
     @Flag(name: .long, help: "Under your home directory instead of the current one") var global = false
 
     func run() throws {
-        let base = global ? FileManager.default.homeDirectoryForCurrentUser
+        let base =
+            global
+            ? FileManager.default.homeDirectoryForCurrentUser
             : URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         var roots: [String] = []
         if claude || all || !codex { roots.append(".claude/skills") }

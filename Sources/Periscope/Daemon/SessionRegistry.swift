@@ -101,9 +101,11 @@ actor SessionRegistry {
     /// every insertion path maintains.
     private func evictOldestIfFull() async {
         guard entries.count >= capacity else { return }
-        guard let victim = entries
-            .filter({ !$0.value.isEphemeral })
-            .min(by: { $0.value.lastUsed < $1.value.lastUsed })
+        guard
+            let victim =
+                entries
+                .filter({ !$0.value.isEphemeral })
+                .min(by: { $0.value.lastUsed < $1.value.lastUsed })
         else { return }
 
         entries[victim.key] = nil

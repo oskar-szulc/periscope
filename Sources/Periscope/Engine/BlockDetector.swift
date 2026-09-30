@@ -21,8 +21,9 @@ enum BlockDetector {
         // "Verifying your request" is Google's soft interstitial: it never
         // clears for a session whose cookies came from a different user agent.
         if url.contains("google."),
-           url.contains("/sorry/") || text.contains("unusual traffic from your computer network")
-            || text.contains("verifying your request") {
+            url.contains("/sorry/") || text.contains("unusual traffic from your computer network")
+                || text.contains("verifying your request")
+        {
             return .googleCaptcha
         }
         if url.contains("duckduckgo.com"), text.contains("bots use duckduckgo too") {
@@ -30,7 +31,8 @@ enum BlockDetector {
         }
         if title.hasPrefix("just a moment")
             || text.contains("verifying you are human")
-            || text.contains("checking your browser before accessing") {
+            || text.contains("checking your browser before accessing")
+        {
             return .cloudflareChallenge
         }
         return nil

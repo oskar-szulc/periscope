@@ -54,8 +54,9 @@ struct ExtractData: ParsableCommand {
             guard let query else { return recordsResult }
 
             guard SystemLanguageModel.default.isAvailable else {
-                FileHandle.standardError.write(Data(
-                    "Apple Intelligence unavailable; returning the page's records instead of extracted fields.\n".utf8))
+                FileHandle.standardError.write(
+                    Data(
+                        "Apple Intelligence unavailable; returning the page's records instead of extracted fields.\n".utf8))
                 return recordsResult
             }
             let content = PageRecords.modelInput(records)
@@ -69,16 +70,20 @@ struct ExtractData: ParsableCommand {
                         : try await Self.extractRows(content: content, fields: Extraction.fieldList(query))
                 }
             } catch PeriscopeError.timeout {
-                FileHandle.standardError.write(Data(
-                    "The on-device model did not answer within \(modelSeconds)s; returning the page's records instead.\n".utf8))
+                FileHandle.standardError.write(
+                    Data(
+                        "The on-device model did not answer within \(modelSeconds)s; returning the page's records instead.\n".utf8
+                    ))
                 return recordsResult
             }
         }
     }
 
     static func json(_ object: Any) -> String {
-        guard let data = try? JSONSerialization.data(
-                withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]) else {
+        guard
+            let data = try? JSONSerialization.data(
+                withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        else {
             return "{}"
         }
         return String(data: data, encoding: .utf8) ?? "{}"
@@ -92,19 +97,20 @@ struct ExtractData: ParsableCommand {
         let schema = try Extraction.rowsSchema(fields: fields)
         var arrays: [[Any]] = []
         for chunk in Extraction.chunks(content) {
-            let session = LanguageModelSession(instructions: """
-                You extract structured records from web page text. Return every \
-                distinct item you find as a row. Fill each requested field from the \
-                text; leave a field empty if the text does not contain it. Never \
-                invent values.
-                """)
+            let session = LanguageModelSession(
+                instructions: """
+                    You extract structured records from web page text. Return every \
+                    distinct item you find as a row. Fill each requested field from the \
+                    text; leave a field empty if the text does not contain it. Never \
+                    invent values.
+                    """)
             let response = try await session.respond(
                 to: """
-                Page content:
-                \(chunk)
+                    Page content:
+                    \(chunk)
 
-                Extract every item, each with these fields: \(fields.joined(separator: ", ")).
-                """,
+                    Extract every item, each with these fields: \(fields.joined(separator: ", ")).
+                    """,
                 schema: schema)
             arrays.append(Extraction.itemsFromResult(response.content.jsonString))
         }
@@ -118,20 +124,23 @@ struct ExtractData: ParsableCommand {
         let allChunks = Extraction.chunks(content)
         let chunk = allChunks.first ?? content
         if allChunks.count > 1 {
-            FileHandle.standardError.write(Data(
-                "Content exceeded one model window; extracted from the first \(chunk.count) chars.\n".utf8))
+            FileHandle.standardError.write(
+                Data(
+                    "Content exceeded one model window; extracted from the first \(chunk.count) chars.\n".utf8))
         }
-        let session = LanguageModelSession(instructions: """
-            You extract data from web page text as JSON. Return only a JSON value \
-            (object or array) matching the request, with no prose or code fences. \
-            Base every value on the text; omit anything the text does not contain.
-            """)
-        let response = try await session.respond(to: """
-            Page content:
-            \(chunk)
+        let session = LanguageModelSession(
+            instructions: """
+                You extract data from web page text as JSON. Return only a JSON value \
+                (object or array) matching the request, with no prose or code fences. \
+                Base every value on the text; omit anything the text does not contain.
+                """)
+        let response = try await session.respond(
+            to: """
+                Page content:
+                \(chunk)
 
-            Extract as JSON: \(description)
-            """)
+                Extract as JSON: \(description)
+                """)
         return .rawJSON(Self.asJSON(response.content))
     }
 

@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import Periscope
 
 @Suite("TextFormatter")
@@ -10,7 +11,10 @@ struct TextFormatterTests {
         let result = CommandResult.navigate(
             title: "Example", url: "https://example.com/", status: 200, textChars: 1234, htmlChars: 51200)
         let output = formatter.format(result)
-        #expect(output == "Navigated to: Example\nURL: https://example.com/\nStatus: 200 \u{00B7} Text: 1,234 chars \u{00B7} HTML: 51,200 chars")
+        #expect(
+            output
+                == "Navigated to: Example\nURL: https://example.com/\nStatus: 200 \u{00B7} Text: 1,234 chars \u{00B7} HTML: 51,200 chars"
+        )
     }
 
     @Test func navigateOutputWithoutStatus() {
@@ -60,8 +64,9 @@ struct JSONFormatterTests {
     }
 
     @Test func fieldsKeepOnlyWhatWasAskedAndOk() throws {
-        let output = JSONFormatter(fields: ["url", "status"]).format(.navigate(
-            title: "Example", url: "https://example.com/", status: 200, textChars: 9, htmlChars: 120))
+        let output = JSONFormatter(fields: ["url", "status"]).format(
+            .navigate(
+                title: "Example", url: "https://example.com/", status: 200, textChars: 9, htmlChars: 120))
         let json = try JSONSerialization.jsonObject(with: Data(output.utf8)) as! [String: Any]
         #expect(Set(json.keys) == ["ok", "url", "status"])
         // extract's raw JSON filters the same way.
