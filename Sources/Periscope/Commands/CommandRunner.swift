@@ -79,6 +79,7 @@ enum CommandRunner {
                 let engine = await MainActor.run {
                     let e = BrowserEngine(viewportWidth: width, viewportHeight: height)
                     e.verbose = globals.verbose
+                    e.setUserAgent(globals.userAgent)
                     return e
                 }
 

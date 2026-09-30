@@ -11,8 +11,22 @@ final class HiddenWindowController {
     let dataStore: WKWebsiteDataStore
     private var screenObserver: NSObjectProtocol?
 
+    /// What real Safari appends to WebKit's user agent. An embedder gets
+    /// neither token by default, and "AppleWebKit ... (KHTML, like Gecko)" with
+    /// nothing after it reads as a WebKit that is not Safari: a headless tell,
+    /// and the one fingerprint gap found when Cloudflare stalled periscope.
+    static let safariProduct: String = {
+        let info = NSDictionary(contentsOfFile: "/Applications/Safari.app/Contents/Info.plist")
+        let version = info?["CFBundleShortVersionString"] as? String ?? {
+            let os = ProcessInfo.processInfo.operatingSystemVersion
+            return "\(os.majorVersion).\(os.minorVersion)"
+        }()
+        return "Version/\(version) Safari/605.1.15"
+    }()
+
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
-        let configuration = WebPage.Configuration()
+        var configuration = WebPage.Configuration()
+        configuration.applicationNameForUserAgent = Self.safariProduct
         // Installed before any page script runs, so requests fired during
         // parsing are counted by `fetchquiet` and logged for `requests`, and
         // console output from the first script onward is kept for `console`.

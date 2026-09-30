@@ -26,6 +26,7 @@ struct Login: ParsableCommand {
         let sessionName = globals.session
         let timeoutSeconds = globals.timeout == 30 ? 120 : globals.timeout
         let viewportStr = globals.viewport
+        let userAgent = globals.userAgent
         let (width, height) = globals.viewportSize
         let untilCondition = until
         let urlString = url
@@ -43,6 +44,7 @@ struct Login: ParsableCommand {
                         sessionName: sessionName,
                         timeoutSeconds: timeoutSeconds,
                         viewportStr: viewportStr,
+                        userAgent: userAgent,
                         untilCondition: untilCondition,
                         formatter: formatter,
                         isJson: isJson
@@ -70,11 +72,13 @@ struct Login: ParsableCommand {
         sessionName: String,
         timeoutSeconds: Int,
         viewportStr: String,
+        userAgent: String?,
         untilCondition: String?,
         formatter: OutputFormatting,
         isJson: Bool
     ) async throws {
         let engine = BrowserEngine(viewportWidth: width, viewportHeight: height)
+        engine.setUserAgent(userAgent)
 
         // Restore existing session if any (to pre-fill cookies)
         if !noSession {

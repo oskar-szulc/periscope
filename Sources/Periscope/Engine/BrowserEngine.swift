@@ -5,6 +5,12 @@ import WebKit
 final class BrowserEngine {
     let windowController: HiddenWindowController
     private var page: WebPage { windowController.page }
+
+    /// `--user-agent`. Sticks for the life of the page once set, so a live
+    /// session keeps one identity (Cloudflare binds its clearance cookie to it).
+    func setUserAgent(_ userAgent: String?) {
+        if let userAgent { page.customUserAgent = userAgent }
+    }
     var verbose: Bool = false
 
     init(viewportWidth: Int = 1920, viewportHeight: Int = 1080) {
