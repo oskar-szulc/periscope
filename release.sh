@@ -5,8 +5,9 @@
 # ad-hoc signed, so no Apple Developer ID is needed) and its .sha256; a
 # Homebrew formula, periscope.rb; an MCP bundle, periscope-<v>.mcpb; and the
 # MCP Registry entry, server.json. With --publish it also creates the GitHub
-# release v<v> with the tarball and bundle. Then: copy periscope.rb to
-# Formula/ in <owner>/homebrew-tap, and `mcp-publisher publish dist/server.json`.
+# release v<v> with the tarball and bundle, which triggers the workflow that
+# lists it in the MCP Registry. Then copy periscope.rb to Formula/ in
+# <owner>/homebrew-tap.
 set -eu
 cd "$(dirname "$0")"
 VERSION=${1:?usage: ./release.sh <version> [--publish]}
@@ -83,28 +84,11 @@ MCPB=periscope-$VERSION.mcpb
 npx -y @anthropic-ai/mcpb validate dist/mcpb/manifest.json
 npx -y @anthropic-ai/mcpb pack dist/mcpb "dist/$MCPB" >/dev/null
 MCPB_SHA=$(shasum -a 256 "dist/$MCPB" | cut -d' ' -f1)
-cat > dist/server.json <<JSON
-{
-  "\$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.oskar-szulc/periscope",
-  "title": "periscope",
-  "description": "A real Safari-engine (WebKit) browser for agents on macOS: sessions, extraction, bot checks.",
-  "version": "$VERSION",
-  "repository": { "url": "https://github.com/$REPO", "source": "github" },
-  "packages": [
-    {
-      "registryType": "mcpb",
-      "identifier": "https://github.com/$REPO/releases/download/v$VERSION/$MCPB",
-      "fileSha256": "$MCPB_SHA",
-      "transport": { "type": "stdio" }
-    }
-  ]
-}
-JSON
+scripts/server-json.sh "$VERSION" "$MCPB_SHA" > dist/server.json
 
 echo "built dist/$TARBALL ($SHA) and dist/$MCPB ($MCPB_SHA)"
 if [ "$PUBLISH" = "--publish" ]; then
     gh release create "v$VERSION" "dist/$TARBALL" "dist/$TARBALL.sha256" "dist/$MCPB" \
         -R "$REPO" --title "v$VERSION" --generate-notes
-    echo "published; now copy dist/periscope.rb to Formula/ in your tap and run: mcp-publisher publish dist/server.json"
+    echo "published; the publish-mcp-registry workflow lists it in the MCP Registry. Now copy dist/periscope.rb to Formula/ in your tap."
 fi
