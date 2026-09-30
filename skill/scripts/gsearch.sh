@@ -8,7 +8,7 @@
 # query (site:, OR, quotes). A session that has already done one plain search
 # carries cookies that let the same query through, so we warm the session once.
 #
-# Canonical copy: ~/.claude/skills/periscope/scripts/gsearch.sh
+# Ships in the periscope skill folder (periscope install-skill).
 # (a copy also lives in the periscope repo under examples/)
 #
 # Exit codes: 0 ok, 2 usage, 5 blocked by a challenge page, 6 not a results page.
@@ -16,7 +16,7 @@
 # periscope failure keeps its meaning.
 set -euo pipefail
 
-P=${PERISCOPE:-/opt/homebrew/bin/periscope}
+P=${PERISCOPE:-periscope}
 SESSION=${SESSION:-google}
 PAGES=1
 while [[ $# -gt 0 ]]; do
