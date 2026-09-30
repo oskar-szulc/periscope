@@ -206,7 +206,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
             let result = try await withTimeout(seconds: options.timeout) {
                 try await session.run(verbose: options.verbose, userAgent: options.userAgent, block)
             }
-            response = .ok(result, warnings: warnings)
+            response = .ok(result, warnings: warnings + (await session.drainWarnings()))
         } catch let error as PeriscopeError {
             if case .timeout = error {
                 warnings.append("Page at timeout: \(await session.locationDescription())")

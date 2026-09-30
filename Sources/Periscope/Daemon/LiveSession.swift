@@ -13,6 +13,12 @@ actor LiveSession {
     /// Warnings raised while restoring, drained by the first command's response.
     private var pendingWarnings: [String] = []
 
+    /// A navigation that failed and left the previous page loaded. Until one
+    /// succeeds, every read carries a warning: `text` after a failed `navigate`
+    /// silently returned the old page, and a studio's listings nearly got
+    /// attributed to two others.
+    private var failedNavigation: String?
+
     /// Commands against one session must not interleave. The actor alone does not
     /// give us that: `await block(engine)` suspends, and actor reentrancy would
     /// let a second command run against the same live page mid-flight.
@@ -48,7 +54,21 @@ actor LiveSession {
             engine.verbose = verbose
             engine.setUserAgent(userAgent)
         }
-        return try await block(engine)
+        let result: CommandResult
+        do {
+            result = try await block(engine)
+        } catch PeriscopeError.navigationFailed(let url, let reason) where !url.isEmpty {
+            failedNavigation = url
+            throw PeriscopeError.navigationFailed(url: url, reason: reason)
+        }
+        if case .navigate = result {
+            failedNavigation = nil
+        } else if let failedNavigation {
+            let current = await MainActor.run { engine.currentURL ?? "(no page)" }
+            pendingWarnings.append(
+                "warning: the last navigate, to \(failedNavigation), failed; this is still \(current)")
+        }
+        return result
     }
 
     /// For timeout messages. Reads the page without taking the session: the
