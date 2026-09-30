@@ -6,11 +6,6 @@ import Foundation
 /// idle sessions age out, and the total is capped with LRU eviction. Eviction is
 /// not data loss -- the session is flushed to disk and cold-starts on next use.
 actor SessionRegistry {
-    struct Info: Sendable {
-        let name: String
-        let lastUsed: Date
-    }
-
     private struct Entry {
         let session: LiveSession
         /// Held here rather than read back off the session actor: an eviction scan
@@ -25,7 +20,7 @@ actor SessionRegistry {
     private let idleTimeout: TimeInterval
     private var ephemeralCounter = 0
 
-    init(capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60) {
+    init(capacity: Int, idleTimeout: TimeInterval) {
         self.capacity = capacity
         self.idleTimeout = idleTimeout
     }
@@ -117,10 +112,13 @@ actor SessionRegistry {
 
     var isEmpty: Bool { entries.isEmpty }
 
-    func info() -> [Info] {
-        entries
-            .map { Info(name: $0.key, lastUsed: $0.value.lastUsed) }
-            .sorted { $0.lastUsed > $1.lastUsed }
+    /// Most recently used first.
+    func info() -> [SessionInfoPayload] {
+        let now = Date()
+        return
+            entries
+            .sorted { $0.value.lastUsed > $1.value.lastUsed }
+            .map { SessionInfoPayload(name: $0.key, idleSeconds: Int(now.timeIntervalSince($0.value.lastUsed))) }
     }
 
     func shutdownAll() async {

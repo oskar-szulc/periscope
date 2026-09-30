@@ -24,9 +24,7 @@ enum DaemonClient {
 
         // The resident daemon is from an older binary and is shutting itself
         // down. Wait for it to go, then retry once against a fresh one.
-        _ = SocketIO.poll(seconds: spawnBudget) {
-            !FileManager.default.fileExists(atPath: DaemonPaths.socket.path)
-        }
+        _ = SocketIO.poll(seconds: spawnBudget) { !socketExists }
         guard let retry = roundTrip(request(for: globals)),
             retry.error?.code != "PROTOCOL_MISMATCH"
         else { return nil }
@@ -112,13 +110,10 @@ enum DaemonClient {
         if let size = try? FileManager.default.attributesOfItem(atPath: logPath)[.size] as? Int, size > 1 << 20 {
             try? FileManager.default.removeItem(atPath: logPath)
         }
-        if !FileManager.default.fileExists(atPath: logPath) {
-            FileManager.default.createFile(atPath: logPath, contents: nil)
-        }
-        let log = FileHandle(forWritingAtPath: logPath)
-        log?.seekToEndOfFile()
-        process.standardOutput = log ?? FileHandle.nullDevice
-        process.standardError = log ?? FileHandle.nullDevice
+        let fd = open(logPath, O_WRONLY | O_CREAT | O_APPEND, 0o600)
+        let log = fd < 0 ? FileHandle.nullDevice : FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+        process.standardOutput = log
+        process.standardError = log
         process.standardInput = FileHandle.nullDevice
         do {
             try process.run()

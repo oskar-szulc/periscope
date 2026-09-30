@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 8
+let periscopeProtocolVersion = 7
 
 enum DaemonPaths {
     /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
@@ -26,10 +26,7 @@ enum DaemonPaths {
         let local = runDirectory.appendingPathComponent("sock")
         guard local.path.utf8.count >= 100 else { return local }
         let hash = runDirectory.path.utf8.reduce(UInt64(0xcbf29ce484222325)) { ($0 ^ UInt64($1)) &* 0x100000001b3 }
-        return socketFallbackDirectory.appendingPathComponent(String(hash, radix: 16) + ".sock")
-    }
-    private static var socketFallbackDirectory: URL {
-        URL(fileURLWithPath: "/tmp/periscope-\(getuid())", isDirectory: true)
+        return URL(fileURLWithPath: "/tmp/periscope-\(getuid())/\(String(hash, radix: 16)).sock")
     }
     static var log: URL { runDirectory.appendingPathComponent("daemon.log") }
     static var lock: URL { runDirectory.appendingPathComponent("lock") }
@@ -55,6 +52,10 @@ enum DaemonPaths {
 struct GlobalOptionsPayload: Codable, Sendable {
     var session: String
     var noSession: Bool
+    /// Unread by the daemon, but a daemon decodes the whole request before it
+    /// checks `protocolVersion`: dropping a field makes an older one answer
+    /// BAD_REQUEST instead of PROTOCOL_MISMATCH, and the client never respawns it.
+    var json: Bool
     var timeout: Int
     var viewport: String
     var verbose: Bool
@@ -65,6 +66,7 @@ struct GlobalOptionsPayload: Codable, Sendable {
     init(_ g: GlobalOptions) {
         session = g.session
         noSession = g.noSession
+        json = g.json
         timeout = g.timeout
         viewport = g.viewport
         verbose = g.verbose

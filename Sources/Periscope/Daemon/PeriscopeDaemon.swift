@@ -1,6 +1,7 @@
 import AppKit
 import ArgumentParser
 import Foundation
+import Synchronization
 
 /// Accepts commands on a unix socket and runs them against live sessions.
 ///
@@ -22,14 +23,10 @@ final class PeriscopeDaemon: @unchecked Sendable {
     private var maintenanceTimer: DispatchSourceTimer?
     private var listenFD: Int32 = -1
     private let idleExit: TimeInterval
-    private var lastActivity = Date()
+    private let lastActivity = Mutex(Date())
     private let startedAt = Date()
-    private let activityLock = NSLock()
 
-    init(
-        capacity: Int = 8, idleTimeout: TimeInterval = 30 * 60,
-        idleExit: TimeInterval = 10 * 60
-    ) {
+    init(capacity: Int, idleTimeout: TimeInterval, idleExit: TimeInterval) {
         self.registry = SessionRegistry(capacity: capacity, idleTimeout: idleTimeout)
         self.idleExit = idleExit
     }
@@ -94,16 +91,16 @@ final class PeriscopeDaemon: @unchecked Sendable {
     }
 
     private func noteActivity() {
-        activityLock.lock()
-        lastActivity = Date()
-        activityLock.unlock()
+        lastActivity.withLock { $0 = Date() }
     }
 
-    /// Synchronous so the lock is never held across a suspension point.
     private func idleSeconds() -> TimeInterval {
-        activityLock.lock()
-        defer { activityLock.unlock() }
-        return Date().timeIntervalSince(lastActivity)
+        Date().timeIntervalSince(lastActivity.withLock { $0 })
+    }
+
+    private func exitDaemon() async {
+        await shutdown()
+        await MainActor.run { NSApp.terminate(nil) }
     }
 
     /// Age out idle sessions every 60s, and exit entirely once nobody is using us
@@ -119,8 +116,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
                 await self.registry.evictIdle()
                 if self.idleSeconds() > self.idleExit, await self.registry.isEmpty {
                     self.maintenanceTimer?.cancel()
-                    await self.shutdown()
-                    await MainActor.run { NSApp.terminate(nil) }
+                    await self.exitDaemon()
                 }
             }
         }
@@ -161,10 +157,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
         guard request.protocolVersion == periscopeProtocolVersion else {
             // Version skew after a rebuild. Refuse, then exit so the client's
             // respawn brings up a daemon matching the new binary.
-            Task {
-                await self.shutdown()
-                await MainActor.run { NSApp.terminate(nil) }
-            }
+            Task { await self.exitDaemon() }
             return .failure(
                 ErrorPayload(
                     code: "PROTOCOL_MISMATCH",
@@ -237,23 +230,17 @@ final class PeriscopeDaemon: @unchecked Sendable {
 
     private func handleControl(_ verb: ControlVerb, arguments: [String]) async -> Response {
         if verb == .close, let name = arguments.first { await registry.close(named: name) }
-        let now = Date()
-        let sessions = await registry.info().map {
-            SessionInfoPayload(
-                name: $0.name, idleSeconds: Int(now.timeIntervalSince($0.lastUsed)))
-        }
         let payload = DaemonStatusPayload(
             pid: ProcessInfo.processInfo.processIdentifier,
-            uptimeSeconds: Int(now.timeIntervalSince(startedAt)),
+            uptimeSeconds: Int(Date().timeIntervalSince(startedAt)),
             protocolVersion: periscopeProtocolVersion,
-            sessions: sessions)
+            sessions: await registry.info())
 
         if verb == .stop {
             // Reply first, then exit -- the client needs the response before we go.
             Task {
                 try? await Task.sleep(for: .milliseconds(150))
-                await self.shutdown()
-                await MainActor.run { NSApp.terminate(nil) }
+                await self.exitDaemon()
             }
         }
         return .status(payload)
