@@ -14,6 +14,8 @@ REPO=${REPO:-oskar-szulc/periscope}
 
 grep -q "version: \"$VERSION\"" Sources/Periscope/Commands/PeriscopeCommand.swift \
     || { echo "PeriscopeCommand.swift is not at version $VERSION; bump it first" >&2; exit 1; }
+grep -q "\"version\": \"$VERSION\"" .claude-plugin/plugin.json \
+    || { echo ".claude-plugin/plugin.json is not at version $VERSION; bump it first" >&2; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree is dirty" >&2; exit 1; }
 ./scripts/embed-skill.sh >/dev/null
 [ -z "$(git status --porcelain)" ] || { echo "embedded skill was stale; commit Sources/Periscope/Generated" >&2; exit 1; }

@@ -1,0 +1,19 @@
+# periscope
+
+> A command-line browser for AI agents on macOS. It runs Safari's engine (WebKit), so websites see a normal Safari, and it keeps named sessions open between commands. Install with `brew install oskar-szulc/tap/periscope`; run `periscope docs` for the full reference.
+
+## Docs
+
+- [README](https://github.com/oskar-szulc/periscope/blob/main/README.md): what it is, install, the read commands compared
+- [Command reference](https://raw.githubusercontent.com/oskar-szulc/periscope/main/PERISCOPE.md): every command, target syntax, exit codes, written for agents (also `periscope docs`)
+- [Agent skill](https://raw.githubusercontent.com/oskar-szulc/periscope/main/skills/periscope/SKILL.md): when to use periscope and failure modes seen in practice
+
+## Install for agents
+
+- [Claude Code plugin](https://github.com/oskar-szulc/periscope/blob/main/.claude-plugin/marketplace.json): `/plugin marketplace add oskar-szulc/periscope`, then `/plugin install periscope@periscope`
+- Any agent: `npx skills add oskar-szulc/periscope`, or `periscope install-skill --all`
+
+## Optional
+
+- [Example](https://github.com/oskar-szulc/periscope/blob/main/examples/books.sh): page through a list with `extract`
+- [Contributing](https://github.com/oskar-szulc/periscope/blob/main/CONTRIBUTING.md)

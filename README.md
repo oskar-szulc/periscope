@@ -22,6 +22,12 @@ Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/oskar-szulc/peri
 To build from source instead (Xcode 26): `swift build -c release`, then copy
 `.build/release/periscope` onto your PATH.
 
+### For agents
+
+- **Claude Code:** `/plugin marketplace add oskar-szulc/periscope`, then `/plugin install periscope@periscope`
+- **Codex, Cursor and others:** `npx skills add oskar-szulc/periscope`
+- **Any agent with a shell:** `periscope docs` prints the full reference
+
 ## Reading a page
 
 | Command | Returns | Use it to |

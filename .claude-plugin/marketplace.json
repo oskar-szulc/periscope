@@ -1,0 +1,12 @@
+{
+  "name": "periscope",
+  "description": "periscope: a Safari-engine browser CLI for agents on macOS",
+  "owner": { "name": "Oskar Szulc" },
+  "plugins": [
+    {
+      "name": "periscope",
+      "source": "./",
+      "description": "Browse, read and scrape the web through a real Safari engine: sessions that stay open, bot-check detection, structured extraction. Needs the periscope CLI (brew install oskar-szulc/tap/periscope)."
+    }
+  ]
+}
