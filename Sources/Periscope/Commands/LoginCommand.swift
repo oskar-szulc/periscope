@@ -126,7 +126,9 @@ struct Login: ParsableCommand {
 
         print(
             formatter.format(
-                .plain("Session '\(sessionName)' saved. URL: \(engine.currentURL ?? urlString)")))
+                .plain(
+                    "\(noSession ? "Login done; not saved (--no-session)" : "Session '\(sessionName)' saved"). URL: \(engine.currentURL ?? urlString)"
+                )))
         engine.close()
     }
 }
