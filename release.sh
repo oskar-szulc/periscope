@@ -1,11 +1,12 @@
 #!/bin/sh
 # Build a release: ./release.sh 0.2.0 [--publish]
 #
-# Writes dist/periscope-<v>-macos.tar.gz (universal arm64 + x86_64, ad-hoc
-# signed, so no Apple Developer ID is needed), its .sha256, and a Homebrew
-# formula, dist/periscope.rb. With --publish it also creates the GitHub
-# release v<v> with those assets; copy the formula into your tap repo
-# (Formula/periscope.rb in <owner>/homebrew-tap) to ship it via brew.
+# Writes to dist/: periscope-<v>-macos.tar.gz (universal arm64 + x86_64,
+# ad-hoc signed, so no Apple Developer ID is needed) and its .sha256; a
+# Homebrew formula, periscope.rb; an MCP bundle, periscope-<v>.mcpb; and the
+# MCP Registry entry, server.json. With --publish it also creates the GitHub
+# release v<v> with the tarball and bundle. Then: copy periscope.rb to
+# Formula/ in <owner>/homebrew-tap, and `mcp-publisher publish dist/server.json`.
 set -eu
 cd "$(dirname "$0")"
 VERSION=${1:?usage: ./release.sh <version> [--publish]}
@@ -51,9 +52,59 @@ class Periscope < Formula
 end
 RUBY
 
-echo "built dist/$TARBALL ($SHA)"
+# MCP bundle: the same binary, run as `periscope mcp`. The tool list comes
+# from the server itself, so it cannot drift from the code.
+mkdir -p dist/mcpb/server
+cp "$BIN" dist/mcpb/server/periscope
+TOOLS=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | "$BIN" mcp \
+    | python3 -c 'import json,sys; print(json.dumps([{"name": t["name"], "description": t["description"]} for t in json.load(sys.stdin)["result"]["tools"]]))')
+cat > dist/mcpb/manifest.json <<JSON
+{
+  "manifest_version": "0.3",
+  "name": "periscope",
+  "display_name": "periscope",
+  "version": "$VERSION",
+  "description": "A real Safari-engine browser for agents: open pages, read them as text or structured JSON, click and type, with sessions that stay open.",
+  "author": { "name": "Oskar Szulc", "url": "https://github.com/oskar-szulc" },
+  "homepage": "https://github.com/$REPO",
+  "repository": { "type": "git", "url": "https://github.com/$REPO" },
+  "license": "MIT",
+  "keywords": ["browser", "scraping", "webkit", "safari", "headless"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/periscope",
+    "mcp_config": { "command": "\${__dirname}/server/periscope", "args": ["mcp"] }
+  },
+  "tools": $TOOLS,
+  "compatibility": { "platforms": ["darwin"] }
+}
+JSON
+MCPB=periscope-$VERSION.mcpb
+npx -y @anthropic-ai/mcpb validate dist/mcpb/manifest.json
+npx -y @anthropic-ai/mcpb pack dist/mcpb "dist/$MCPB" >/dev/null
+MCPB_SHA=$(shasum -a 256 "dist/$MCPB" | cut -d' ' -f1)
+cat > dist/server.json <<JSON
+{
+  "\$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.oskar-szulc/periscope",
+  "title": "periscope",
+  "description": "A real Safari-engine (WebKit) browser for agents on macOS: sessions, extraction, bot checks.",
+  "version": "$VERSION",
+  "repository": { "url": "https://github.com/$REPO", "source": "github" },
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/$REPO/releases/download/v$VERSION/$MCPB",
+      "fileSha256": "$MCPB_SHA",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}
+JSON
+
+echo "built dist/$TARBALL ($SHA) and dist/$MCPB ($MCPB_SHA)"
 if [ "$PUBLISH" = "--publish" ]; then
-    gh release create "v$VERSION" "dist/$TARBALL" "dist/$TARBALL.sha256" \
+    gh release create "v$VERSION" "dist/$TARBALL" "dist/$TARBALL.sha256" "dist/$MCPB" \
         -R "$REPO" --title "v$VERSION" --generate-notes
-    echo "published; now copy dist/periscope.rb to Formula/periscope.rb in your tap repo"
+    echo "published; now copy dist/periscope.rb to Formula/ in your tap and run: mcp-publisher publish dist/server.json"
 fi
