@@ -35,10 +35,11 @@ enum DaemonClient {
 
     /// Lifecycle request. Unlike a command this never auto-spawns -- asking a
     /// daemon that is not running for its status should say so, not start one.
-    static func control(_ verb: ControlVerb) -> DaemonStatusPayload? {
+    static func control(_ verb: ControlVerb, arguments: [String] = []) -> DaemonStatusPayload? {
         guard let fd = connect() else { return nil }
         defer { close(fd) }
-        return exchange(fd: fd, request: Request(control: verb, arguments: [], workingDirectory: nil, options: nil))?.status
+        return exchange(fd: fd, request: Request(control: verb, arguments: arguments, workingDirectory: nil, options: nil))?
+            .status
     }
 
     private static func request(for globals: GlobalOptions) -> Request {

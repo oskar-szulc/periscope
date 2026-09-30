@@ -84,6 +84,13 @@ actor SessionRegistry {
         await entry.session.abandon()
     }
 
+    /// `session delete`: the page goes with the saved copy, unsaved, or the
+    /// daemon would write the session back to disk on its next eviction.
+    func close(named name: String) async {
+        guard let entry = entries.removeValue(forKey: name) else { return }
+        await entry.session.abandon()
+    }
+
     func touch(_ name: String) {
         entries[name]?.lastUsed = Date()
     }

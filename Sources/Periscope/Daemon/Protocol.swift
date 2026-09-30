@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 6
+let periscopeProtocolVersion = 7
 
 enum DaemonPaths {
     /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
@@ -80,6 +80,8 @@ struct GlobalOptionsPayload: Codable, Sendable {
 enum ControlVerb: String, Codable, Sendable {
     case status
     case stop
+    /// Drop the live session named in `arguments[0]`, unsaved (`session delete`).
+    case close
 }
 
 struct SessionInfoPayload: Codable, Sendable {

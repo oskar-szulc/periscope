@@ -174,7 +174,7 @@ final class PeriscopeDaemon: @unchecked Sendable {
         }
 
         if let verb = request.control {
-            return await handleControl(verb)
+            return await handleControl(verb, arguments: request.arguments)
         }
 
         // Re-parse with ArgumentParser rather than trusting a pre-parsed payload,
@@ -235,7 +235,8 @@ final class PeriscopeDaemon: @unchecked Sendable {
         return response
     }
 
-    private func handleControl(_ verb: ControlVerb) async -> Response {
+    private func handleControl(_ verb: ControlVerb, arguments: [String]) async -> Response {
+        if verb == .close, let name = arguments.first { await registry.close(named: name) }
         let now = Date()
         let sessions = await registry.info().map {
             SessionInfoPayload(
