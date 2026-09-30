@@ -59,3 +59,31 @@ struct WaitChallengeTests {
         #expect(title == "Real page")
     }
 }
+
+@Suite("login completion")
+struct LoginCompletionTests {
+    private func page(_ name: String, _ body: String) throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID().uuidString).html")
+        try "<html><body>\(body)</body></html>".write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
+
+    /// `/wp-admin/` redirects to `/wp-login.php` before the person sees it: the
+    /// page it landed on is the baseline, not the URL that was asked for.
+    @Test @MainActor func aRedirectBeforeTheWindowOpensIsNotALogin() async throws {
+        let engine = BrowserEngine(viewportWidth: 800, viewportHeight: 600)
+        defer { engine.close() }
+        let requested = try page("admin", "")
+        let dashboard = try page("dashboard", "")
+        _ = try await engine.navigate(to: try page("login", "<form></form>"))
+        await #expect(throws: PeriscopeError.self) {
+            try await withTimeout(seconds: 3) {
+                try await engine.waitForLoginCompletion(initialURL: requested, until: nil)
+            }
+        }
+        _ = try await engine.runJavaScript("location.href = '\(dashboard.absoluteString)'")
+        try await withTimeout(seconds: 5) {
+            try await engine.waitForLoginCompletion(initialURL: requested, until: nil)
+        }
+    }
+}

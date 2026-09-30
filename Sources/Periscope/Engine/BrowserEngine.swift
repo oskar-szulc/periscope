@@ -432,9 +432,12 @@ final class BrowserEngine {
         windowController.hideWindow()
     }
 
-    /// Wait for the URL to change away from `initialPath`, or for an explicit condition.
+    /// Wait for the URL path to change away from the page the login opened on,
+    /// or for an explicit condition. The baseline is where the page landed, not
+    /// `initialURL`: a redirect before the window opens (`/wp-admin/` to the
+    /// login form) is not the person logging in.
     func waitForLoginCompletion(initialURL: URL, until: UntilCondition?) async throws {
-        let initialPath = initialURL.path
+        let initialPath = (page.url ?? initialURL).path
 
         while true {
             if let until {

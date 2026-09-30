@@ -336,7 +336,7 @@ periscope session import <name> <path>   # Import from a directory
 periscope login <url> --session myapp
 ```
 
-Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion by URL change; `--until` makes it explicit:
+Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion when the URL path changes from the page it opened on (after any redirect); `--until` makes it explicit:
 
 - `selector:<css>` (an element exists), `url:<text>`, `title:<text>` (contains, case-insensitive)
 - `!` before the colon inverts: `--until "title!:Just a moment"` waits for a challenge page to go, with no knowledge of the page behind it

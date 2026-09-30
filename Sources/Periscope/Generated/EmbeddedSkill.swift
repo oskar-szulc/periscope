@@ -142,7 +142,7 @@ What the script encodes, so you don't rediscover it:
 - **Google CAPTCHAs a fresh session whose first request is operator-heavy.** The fix is not backoff. Do one plain search first (any query); the cookies it sets let the same operator query through immediately. Cookies persist on disk per session name, so this is a one-time cost per session, not per run.
 - **Pagination:** the `#pnnext` id is gone. Match the anchor whose text is `Next`, or navigate with `&start=10`, `&start=20`.
 - **Extraction:** `document.querySelectorAll("a h3")` then `closest("a")`. Class names (`div.g`, `.yuRUbf`) churn; this doesn't.
-- **Blocked detection:** `navigate` itself exits 5 with code `BLOCKED` on Google's sorry page, DuckDuckGo's challenge, or a Cloudflare interstitial, and `state` prints a `Blocked: <kind>` line. The script also treats `consent.google.` as blocked. Clear it once by hand with `periscope login 'https://www.google.com/search?q=test' --session google --until 'selector:a h3'`. The `--until` matters: `login` otherwise stops on the first URL change, and the redirect to the CAPTCHA page is itself a URL change. The clearance cookie stays in the session. This needs a person at the Mac.
+- **Blocked detection:** `navigate` itself exits 5 with code `BLOCKED` on Google's sorry page, DuckDuckGo's challenge, or a Cloudflare interstitial, and `state` prints a `Blocked: <kind>` line. The script also treats `consent.google.` as blocked. Clear it once by hand with `periscope login 'https://www.google.com/search?q=test' --session google --until 'selector:a h3'`. The `--until` waits for results to show, not just for the page to leave the CAPTCHA. The clearance cookie stays in the session. This needs a person at the Mac.
 - **Other engines are not fallbacks.** Bing silently drops `site:` and returns generic results. DuckDuckGo's HTML endpoint serves its own CAPTCHA. Use Google.
 
 ## Read the navigate report
@@ -550,7 +550,7 @@ periscope session import <name> <path>   # Import from a directory
 periscope login <url> --session myapp
 ```
 
-Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion by URL change; `--until` makes it explicit:
+Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion when the URL path changes from the page it opened on (after any redirect); `--until` makes it explicit:
 
 - `selector:<css>` (an element exists), `url:<text>`, `title:<text>` (contains, case-insensitive)
 - `!` before the colon inverts: `--until "title!:Just a moment"` waits for a challenge page to go, with no knowledge of the page behind it
