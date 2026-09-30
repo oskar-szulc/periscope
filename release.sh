@@ -5,9 +5,8 @@
 # ad-hoc signed, so no Apple Developer ID is needed) and its .sha256; a
 # Homebrew formula, periscope.rb; an MCP bundle, periscope-<v>.mcpb; and the
 # MCP Registry entry, server.json. With --publish it also creates the GitHub
-# release v<v> with the tarball and bundle, which triggers the workflow that
-# lists it in the MCP Registry. Then copy periscope.rb to Formula/ in
-# <owner>/homebrew-tap.
+# release v<v> with the tarball and bundle, which triggers the workflows that
+# list it in the MCP Registry and update <owner>/homebrew-tap.
 set -eu
 cd "$(dirname "$0")"
 VERSION=${1:?usage: ./release.sh <version> [--publish]}
@@ -33,25 +32,7 @@ tar -czf "dist/$TARBALL" -C "$(dirname "$BIN")" periscope
 (cd dist && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA=$(cut -d' ' -f1 "dist/$TARBALL.sha256")
 
-cat > dist/periscope.rb <<RUBY
-class Periscope < Formula
-  desc "Headless Safari-engine browser CLI for agents"
-  homepage "https://github.com/$REPO"
-  url "https://github.com/$REPO/releases/download/v$VERSION/$TARBALL"
-  sha256 "$SHA"
-  license "MIT"
-
-  depends_on macos: :tahoe
-
-  def install
-    bin.install "periscope"
-  end
-
-  test do
-    assert_match "$VERSION", shell_output("#{bin}/periscope --version")
-  end
-end
-RUBY
+scripts/formula.sh "$VERSION" "$SHA" > dist/periscope.rb
 
 # MCP bundle: the same binary, run as `periscope mcp`. The tool list comes
 # from the server itself, so it cannot drift from the code.
@@ -90,5 +71,5 @@ echo "built dist/$TARBALL ($SHA) and dist/$MCPB ($MCPB_SHA)"
 if [ "$PUBLISH" = "--publish" ]; then
     gh release create "v$VERSION" "dist/$TARBALL" "dist/$TARBALL.sha256" "dist/$MCPB" \
         -R "$REPO" --title "v$VERSION" --generate-notes
-    echo "published; the publish-mcp-registry workflow lists it in the MCP Registry. Now copy dist/periscope.rb to Formula/ in your tap."
+    echo "published; workflows now list it in the MCP Registry and update the Homebrew tap."
 fi

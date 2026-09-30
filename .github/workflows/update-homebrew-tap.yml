@@ -1,0 +1,52 @@
+name: Update Homebrew tap
+
+# A published release (release.sh --publish) updates Formula/periscope.rb in
+# oskar-szulc/homebrew-tap, through a deploy key that can write to that one
+# repository (secret HOMEBREW_TAP_DEPLOY_KEY). Run it manually with dry_run to
+# see the formula without pushing.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.2.1
+        required: true
+      dry_run:
+        description: Show the formula, do not push
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      PUSH: ${{ github.event_name == 'release' || !inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: oskar-szulc/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: tap
+      - name: Write the formula
+        run: |
+          version=${TAG#v}
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "periscope-$version-macos.tar.gz.sha256"
+          sha=$(cut -d' ' -f1 "periscope-$version-macos.tar.gz.sha256")
+          scripts/formula.sh "$version" "$sha" > tap/Formula/periscope.rb
+          git -C tap diff
+      - name: Commit and push
+        if: env.PUSH == 'true'
+        run: |
+          cd tap
+          if git diff --quiet; then echo "formula unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "periscope ${TAG#v}"
+          git push
