@@ -355,8 +355,10 @@ periscope elements "<selector>"          # Matching elements with tag, id, class
 ```
 
 Reach for these when you want one specific thing; use `state` when you want to
-orient. `text` is the most token-efficient view of a page's prose. On a busy page most
-of its size is link URLs: onet.pl's front page is 40k characters, 16k with `--no-links`.
+orient. `text` is the most token-efficient view of a page's prose. It reads the rendered
+page, not its HTML: only visible text, blocks split where the browser lays them out, links
+as absolute URLs. On a busy page most of its size is those URLs: onet.pl's front page is
+41k characters, 17k with `--no-links`.
 
 ### Native input
 

@@ -12,9 +12,9 @@ struct Extract: ParsableCommand {
     @Flag(name: .long, help: "Drop link targets, keeping the link text (use links or state for URLs)") var noLinks: Bool = false
 
     func run() throws {
-        let converter = HTMLToMarkdown(links: !noLinks, images: images)
+        let (links, images) = (!noLinks, images)
         CommandRunner.run(globals: globals) { engine in
-            let content = try await engine.extractText(selector: selector, raw: raw, converter: converter)
+            let content = try await engine.extractText(selector: selector, raw: raw, links: links, images: images)
             return .extract(content: content)
         }
     }
