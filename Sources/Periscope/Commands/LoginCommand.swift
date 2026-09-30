@@ -12,10 +12,11 @@ struct Login: ParsableCommand {
     @Argument(help: "URL to navigate to for login")
     var url: String
 
-    @Option(name: .long, help: "Condition to detect login completion: selector:<css> or url:<pattern>. Default: auto-detect URL change.")
+    @Option(name: .long, help: "When login is done: selector:<css>, url:<text> or title:<text>; ! before the colon inverts (title!:Just a moment). Default: the URL path changes.")
     var until: String?
 
     func run() throws {
+        let untilCondition = try until.map(UntilCondition.parse)
         guard let parsedURL = URL(string: url) else {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
@@ -24,11 +25,11 @@ struct Login: ParsableCommand {
         let isJson = globals.json
         let noSession = globals.noSession
         let sessionName = globals.session
+        // A person needs longer than a page load; 0 waits until Ctrl-C.
         let timeoutSeconds = globals.timeout == 30 ? 120 : globals.timeout
         let viewportStr = globals.viewport
         let userAgent = globals.userAgent
         let (width, height) = globals.viewportSize
-        let untilCondition = until
         let urlString = url
         let formatter = makeFormatter(json: isJson)
 
@@ -73,7 +74,7 @@ struct Login: ParsableCommand {
         timeoutSeconds: Int,
         viewportStr: String,
         userAgent: String?,
-        untilCondition: String?,
+        untilCondition: UntilCondition?,
         formatter: OutputFormatting,
         isJson: Bool
     ) async throws {
@@ -96,11 +97,19 @@ struct Login: ParsableCommand {
             Data("Log in manually. Periscope will detect when you're done.\n".utf8))
 
         // Wait for login completion with timeout
-        try await withTimeout(seconds: timeoutSeconds) {
-            try await engine.waitForLoginCompletion(
-                initialURL: parsedURL,
-                until: untilCondition
-            )
+        do {
+            if timeoutSeconds == 0 {
+                try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
+            } else {
+                try await withTimeout(seconds: timeoutSeconds) {
+                    try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
+                }
+            }
+        } catch PeriscopeError.timeout {
+            let waited = untilCondition.map { "--until \($0) never held" } ?? "the URL path never changed"
+            FileHandle.standardError.write(Data(
+                "\(waited). Page at timeout: \(engine.locationDescription). Pass --timeout <s> for longer, 0 to wait until Ctrl-C.\n".utf8))
+            throw PeriscopeError.timeout(seconds: timeoutSeconds)
         }
 
         // Hide the window

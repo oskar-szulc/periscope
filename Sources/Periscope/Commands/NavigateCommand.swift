@@ -12,22 +12,37 @@ enum NavigationReport {
     /// exits like any other argument error rather than being ignored.
     static func run(
         globals: GlobalOptions,
+        challengeSeconds: Int = 0,
         navigate: @escaping @MainActor @Sendable (BrowserEngine) async throws -> String
     ) {
         CommandRunner.run(globals: globals) { engine in
             let wait = try globals.waitStrategy(default: .navigateDefault)
             let url = try await navigate(engine)
-            return try await make(engine: engine, wait: wait, fallbackURL: url)
+            return try await make(engine: engine, wait: wait, fallbackURL: url, challengeSeconds: challengeSeconds)
         }
     }
 
     @MainActor
-    static func make(engine: BrowserEngine, wait: WaitStrategy, fallbackURL: String) async throws -> CommandResult {
+    static func make(engine: BrowserEngine, wait: WaitStrategy, fallbackURL: String,
+                     challengeSeconds: Int = 0) async throws -> CommandResult {
         try await engine.waitFor(wait)
 
-        let url = engine.currentURL ?? fallbackURL
         // One look at the settled page: title, text size and challenge check.
-        let page = try await engine.observePage()
+        var page = try await engine.observePage()
+        // A managed challenge (Cloudflare) often clears itself after a few
+        // seconds of JS and reloads into the real page; give it that time
+        // before calling the page blocked.
+        let deadline = ContinuousClock.now + .seconds(challengeSeconds)
+        while page.blocked != nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(500))
+            // Mid-reload the page may refuse JS: keep the last look.
+            page = (try? await engine.observePage()) ?? page
+            if page.blocked == nil {
+                try await engine.waitFor(wait)
+                page = try await engine.observePage()
+            }
+        }
+        let url = engine.currentURL ?? fallbackURL
         if let kind = page.blocked {
             throw PeriscopeError.blocked(kind: kind, url: url)
         }
@@ -39,12 +54,18 @@ struct Navigate: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Navigate to a URL")
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "URL to navigate to") var url: String
+    @Option(name: .long, help: "Seconds to let a bot challenge clear itself before failing as blocked (needs --timeout above it)")
+    var waitChallenge: Int = 0
 
     func run() throws {
         guard let parsedURL = URL(string: url) else {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
-        NavigationReport.run(globals: globals) { try await $0.navigate(to: parsedURL) }
+        if waitChallenge > 0 && waitChallenge + 10 > globals.timeout {
+            throw PeriscopeError.argumentError(
+                reason: "--wait-challenge \(waitChallenge) needs --timeout of at least \(waitChallenge + 10) to leave room for the load")
+        }
+        NavigationReport.run(globals: globals, challengeSeconds: waitChallenge) { try await $0.navigate(to: parsedURL) }
     }
 }
 

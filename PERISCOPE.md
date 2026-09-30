@@ -69,7 +69,13 @@ rendered nothing reads as success otherwise. `--json` carries them as `status` a
 
 If the page that loaded is a bot challenge rather than content, the command **fails with exit 5**
 and code `BLOCKED`, naming the kind: `google-captcha`, `duckduckgo-challenge`, `cloudflare-challenge`.
-Clear it once with `login` (see below); the clearance cookie persists in the session.
+A managed challenge (Cloudflare's "Just a moment...") often clears itself after a few
+seconds of JS: `navigate <url> --wait-challenge 20 --timeout 40` gives it that long
+before failing. Otherwise clear it once with `login` (see below); the clearance cookie
+persists in the session.
+
+Any command that times out also prints `Page at timeout: <url> "<title>"` on stderr,
+so a challenge that never cleared is told apart from a condition that never matched.
 
 ### Orienting: `state`
 
@@ -306,7 +312,12 @@ periscope session import <name> <path>   # Import from a directory
 periscope login <url> --session myapp
 ```
 
-Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion by URL change; use `--until "selector:.dashboard"` or `--until "url:/home"` to be explicit.
+Opens a **visible** window so a person can log in by hand, then saves cookies and storage to the session. Detects completion by URL change; `--until` makes it explicit:
+
+- `selector:<css>` (an element exists), `url:<text>`, `title:<text>` (contains, case-insensitive)
+- `!` before the colon inverts: `--until "title!:Just a moment"` waits for a challenge page to go, with no knowledge of the page behind it
+
+It waits 120 seconds by default; `--timeout 600` gives ten minutes and `--timeout 0` waits until Ctrl-C. On timeout it says which condition never held and where the page was.
 
 After this, the session is authenticated and normal commands work:
 

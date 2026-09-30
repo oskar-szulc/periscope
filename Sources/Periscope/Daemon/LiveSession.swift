@@ -51,6 +51,12 @@ actor LiveSession {
         return try await block(engine)
     }
 
+    /// For timeout messages. Reads the page without taking the session: the
+    /// timed-out command may still hold it.
+    func locationDescription() async -> String {
+        await MainActor.run { engine.locationDescription }
+    }
+
     func drainWarnings() -> [String] {
         defer { pendingWarnings.removeAll() }
         return pendingWarnings

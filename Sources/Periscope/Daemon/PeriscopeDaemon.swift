@@ -208,6 +208,9 @@ final class PeriscopeDaemon: @unchecked Sendable {
             }
             response = .ok(result, warnings: warnings)
         } catch let error as PeriscopeError {
+            if case .timeout = error {
+                warnings.append("Page at timeout: \(await session.locationDescription())")
+            }
             response = .failure(ErrorPayload(error), warnings: warnings)
         } catch {
             warnings.append("unexpected error: \(error)")

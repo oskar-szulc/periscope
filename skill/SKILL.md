@@ -105,6 +105,7 @@ Fields send those records (not the raw page) to the model. When the model is una
 | Retrying after `cannot run inside a sandbox` (exit 3) | It will fail the same way. Rerun with the sandbox disabled. |
 | Empty output taken as "no jobs" | Exit 6 means wrong page; exit 0 with no lines means Google truly returned nothing. Check the navigate report's `Text:` count too. |
 | Grepping `text` for "unusual traffic" | `navigate` already exits 5 with `BLOCKED`. Branch on the exit code. |
+| Treating a Cloudflare `BLOCKED` as final | Retry once with `--wait-challenge 20 --timeout 40`; the managed challenge often clears itself. Then `login --until "title!:Just a moment" --timeout 0`. |
 | Trusting `WebSearch` with `(A OR B) (C OR D)` | It returned a California hospice job for an Ontario-only query. Filter results yourself or use periscope. |
 | Rewriting the search from primitives | `scripts/gsearch.sh` already handles encoding, warm-up, unwrapping, paging, block detection. |
 | `state --actions-only` on a dense page to find one selector | 80 actions, 14k chars. Use `state --match` or a semantic target like `label:Search`. |

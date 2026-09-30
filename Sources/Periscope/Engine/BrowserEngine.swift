@@ -65,6 +65,12 @@ final class BrowserEngine {
     var currentURL: String? { page.url?.absoluteString }
     var currentTitle: String? { page.title.isEmpty ? nil : page.title }
 
+    /// Where the page is, for a timeout message: "the challenge never cleared"
+    /// and "my selector was wrong" look identical without it.
+    var locationDescription: String {
+        "\(currentURL ?? "(no page)") \"\(currentTitle ?? "")\""
+    }
+
     /// HTTP status of the main-frame response for the most recent navigation.
     var lastStatusCode: Int? { windowController.responseRecorder.statusCode }
 
@@ -363,19 +369,16 @@ final class BrowserEngine {
     }
 
     /// Wait for the URL to change away from `initialPath`, or for an explicit condition.
-    func waitForLoginCompletion(initialURL: URL, until: String?) async throws {
+    func waitForLoginCompletion(initialURL: URL, until: UntilCondition?) async throws {
         let initialPath = initialURL.path
 
         while true {
             if let until {
-                if until.hasPrefix("selector:") {
-                    let css = String(until.dropFirst("selector:".count))
-                    let exists = try await runJavaScript(ElementResolver.existsScript(selector: css)) as? Bool ?? false
-                    if exists { break }
-                } else if until.hasPrefix("url:") {
-                    let pattern = String(until.dropFirst("url:".count))
-                    if let currentURL = page.url?.absoluteString, currentURL.contains(pattern) { break }
-                }
+                // Mid-navigation the page may refuse JS; that is "not yet", not a failure.
+                let matches = until.kind == .selector
+                    ? (try? await runJavaScript(ElementResolver.existsScript(selector: until.value))) as? Bool ?? false
+                    : false
+                if until.holds(url: page.url?.absoluteString ?? "", title: page.title, matches: matches) { break }
             } else {
                 if let currentURL = page.url {
                     let currentPath = currentURL.path

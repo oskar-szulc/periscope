@@ -102,6 +102,10 @@ enum CommandRunner {
                     print(formatter.format(result))
                     await MainActor.run { engine.close() }
                 } catch let error as PeriscopeError {
+                    if case .timeout = error {
+                        let at = await MainActor.run { engine.locationDescription }
+                        FileHandle.standardError.write(Data("Page at timeout: \(at)\n".utf8))
+                    }
                     emit(ErrorPayload(error), formatter: formatter, globals: globals)
                     await MainActor.run { engine.close() }
                     Foundation.exit(error.exitCode)
