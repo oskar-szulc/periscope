@@ -15,7 +15,6 @@ enum EmbeddedSkill {
 # carries cookies that let the same query through, so we warm the session once.
 #
 # Ships in the periscope skill folder (periscope install-skill).
-# (a copy also lives in the periscope repo under examples/)
 #
 # Exit codes: 0 ok, 2 usage, 5 blocked by a challenge page, 6 not a results page.
 # periscope itself uses 0-4 for its own errors and 5 for BLOCKED, so a propagated
