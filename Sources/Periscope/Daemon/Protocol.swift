@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 7
+let periscopeProtocolVersion = 8
 
 enum DaemonPaths {
     /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
@@ -55,7 +55,6 @@ enum DaemonPaths {
 struct GlobalOptionsPayload: Codable, Sendable {
     var session: String
     var noSession: Bool
-    var json: Bool
     var timeout: Int
     var viewport: String
     var verbose: Bool
@@ -66,7 +65,6 @@ struct GlobalOptionsPayload: Codable, Sendable {
     init(_ g: GlobalOptions) {
         session = g.session
         noSession = g.noSession
-        json = g.json
         timeout = g.timeout
         viewport = g.viewport
         verbose = g.verbose
@@ -120,11 +118,10 @@ struct ErrorPayload: Codable, Sendable {
     /// For MULTIPLE_ELEMENTS_FOUND: unique selectors the caller can retry with.
     var candidates: [String]?
 
-    init(code: String, message: String, exitCode: Int32, url: String? = nil) {
+    init(code: String, message: String, exitCode: Int32) {
         self.code = code
         self.message = message
         self.exitCode = exitCode
-        self.url = url
     }
 
     init(_ error: PeriscopeError) {

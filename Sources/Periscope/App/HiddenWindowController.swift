@@ -91,11 +91,6 @@ final class HiddenWindowController {
         resourceMode = mode
     }
 
-    func resize(width: Int, height: Int) {
-        viewport = NSSize(width: width, height: height)
-        window.setContentSize(viewport)
-    }
-
     func showWindow(width: Int = 390, height: Int = 844) {
         window.styleMask = [.titled, .closable, .resizable]
         window.setContentSize(NSSize(width: width, height: height))

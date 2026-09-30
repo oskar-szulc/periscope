@@ -496,11 +496,6 @@ final class BrowserEngine {
         return try await page.exported(as: .image(region: .rect(CGRect(x: 0, y: 0, width: size[0], height: size[1]))))
     }
 
-    /// Export the current page as a PDF.
-    func exportPDF() async throws -> Data {
-        try await page.exported(as: .pdf())
-    }
-
     // MARK: - Interaction
 
     func click(selector: String, strict: Bool) async throws {

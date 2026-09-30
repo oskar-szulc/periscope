@@ -16,7 +16,5 @@ jobs:
         run: ./scripts/lint.sh
       - name: Embedded skill and reference match skills/ and PERISCOPE.md
         run: ./scripts/embed-skill.sh && git diff --exit-code
-      - name: Build (warnings are errors)
-        run: swift build --build-tests
-      - name: Test
+      - name: Build and test (warnings are errors)
         run: swift test

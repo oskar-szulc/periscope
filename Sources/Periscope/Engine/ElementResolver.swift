@@ -186,10 +186,6 @@ enum ElementResolver {
         "(function() { var P = window.__periscope; var T = \(jsString(target)); \(body) })()"
     }
 
-    static func countScript(selector: String) -> String {
-        wrap(target: selector, "return P.query(T).length;")
-    }
-
     static func existsScript(selector: String) -> String {
         wrap(target: selector, "return P.query(T).length > 0;")
     }

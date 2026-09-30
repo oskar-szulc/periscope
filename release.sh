@@ -2,9 +2,8 @@
 # Build a release: ./release.sh 0.2.0 [--publish]
 #
 # Writes to dist/: periscope-<v>-macos.tar.gz (universal arm64 + x86_64,
-# ad-hoc signed, so no Apple Developer ID is needed) and its .sha256; a
-# Homebrew formula, periscope.rb; an MCP bundle, periscope-<v>.mcpb; and the
-# MCP Registry entry, server.json. With --publish it also creates the GitHub
+# ad-hoc signed, so no Apple Developer ID is needed) and its .sha256, and an
+# MCP bundle, periscope-<v>.mcpb. With --publish it also creates the GitHub
 # release v<v> with the tarball and bundle, which triggers the workflows that
 # list it in the MCP Registry and update <owner>/homebrew-tap.
 set -eu
@@ -32,7 +31,6 @@ tar -czf "dist/$TARBALL" -C "$(dirname "$BIN")" periscope
 (cd dist && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA=$(cut -d' ' -f1 "dist/$TARBALL.sha256")
 
-scripts/formula.sh "$VERSION" "$SHA" > dist/periscope.rb
 
 # MCP bundle: the same binary, run as `periscope mcp`. The tool list comes
 # from the server itself, so it cannot drift from the code.
@@ -65,7 +63,6 @@ MCPB=periscope-$VERSION.mcpb
 npx -y @anthropic-ai/mcpb validate dist/mcpb/manifest.json
 npx -y @anthropic-ai/mcpb pack dist/mcpb "dist/$MCPB" >/dev/null
 MCPB_SHA=$(shasum -a 256 "dist/$MCPB" | cut -d' ' -f1)
-scripts/server-json.sh "$VERSION" "$MCPB_SHA" > dist/server.json
 
 echo "built dist/$TARBALL ($SHA) and dist/$MCPB ($MCPB_SHA)"
 if [ "$PUBLISH" = "--publish" ]; then

@@ -77,14 +77,12 @@ enum PageSummarizer {
                 }
                 if (label) entry.label = label;
 
-                var text = (el.value && el.type !== 'password' ? '' : '')
-                    || el.textContent.replace(/\\s+/g, ' ').trim();
+                var text = el.textContent.replace(/\\s+/g, ' ').trim();
                 if (text && text.length <= 100) entry.text = text;
 
                 if (el.tagName === 'A') entry.href = el.getAttribute('href');
                 if (el.disabled) entry.disabled = true;
-                if (el.checked !== undefined && el.type &&
-                    (el.type === 'checkbox' || el.type === 'radio')) {
+                if (el.type === 'checkbox' || el.type === 'radio') {
                     entry.checked = !!el.checked;
                 }
 

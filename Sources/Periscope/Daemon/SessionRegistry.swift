@@ -91,10 +91,6 @@ actor SessionRegistry {
         await entry.session.abandon()
     }
 
-    func touch(_ name: String) {
-        entries[name]?.lastUsed = Date()
-    }
-
     func evictIdle() async {
         let cutoff = Date().addingTimeInterval(-idleTimeout)
         // An ephemeral session belongs to an in-flight command, never to the clock.

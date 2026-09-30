@@ -16,18 +16,15 @@ sess_daemon="eqv-daemon-$$"
 
 cleanup() {
     rm -rf ~/.periscope/sessions/"$sess_direct" ~/.periscope/sessions/"$sess_daemon"
-    rm -f /tmp/eqv.direct.err /tmp/eqv.daemon.err
 }
 trap cleanup EXIT
 
 run_both() {
     local desc="$1"; shift
 
-    local d_out d_err d_code n_out n_err n_code
-    d_out=$("$BIN" "$@" --session "$sess_direct" --no-daemon 2>"/tmp/eqv.direct.err"); d_code=$?
-    d_err=$(cat /tmp/eqv.direct.err)
-    n_out=$("$BIN" "$@" --session "$sess_daemon" 2>"/tmp/eqv.daemon.err"); n_code=$?
-    n_err=$(cat /tmp/eqv.daemon.err)
+    local d_out d_code n_out n_code
+    d_out=$("$BIN" "$@" --session "$sess_direct" --no-daemon 2>/dev/null); d_code=$?
+    n_out=$("$BIN" "$@" --session "$sess_daemon" 2>/dev/null); n_code=$?
 
     if [[ "$d_out" == "$n_out" && "$d_code" == "$n_code" ]]; then
         PASS=$((PASS+1)); printf '  ok   %s\n' "$desc"
