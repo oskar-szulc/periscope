@@ -483,14 +483,14 @@ final class BrowserEngine {
     }
 
     /// Take a screenshot using WebPage.exported(as:) for native image capture.
+    /// The viewport, or the whole page with `full`. Not `.image()`: its region
+    /// defaults to `.contents`, so every screenshot used to be a full-page one.
+    /// `.rect` is relative to the visible viewport, not the document.
     func takeScreenshot(full: Bool) async throws -> Data {
-        let config: WebPage.ExportedContentConfiguration
-        if full {
-            config = .image(region: .contents)
-        } else {
-            config = .image()
-        }
-        return try await page.exported(as: config)
+        if full { return try await page.exported(as: .image(region: .contents)) }
+        let size = try await runJavaScript("[innerWidth, innerHeight]") as? [Double] ?? []
+        guard size.count == 2 else { return try await page.exported(as: .image(region: .contents)) }
+        return try await page.exported(as: .image(region: .rect(CGRect(x: 0, y: 0, width: size[0], height: size[1]))))
     }
 
     /// Export the current page as a PDF.
