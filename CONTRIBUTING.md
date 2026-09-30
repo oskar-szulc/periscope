@@ -11,9 +11,11 @@ swift test             # includes tests that load real pages in WebKit
 - **Skill changes:** edit `skill/`, then run `./scripts/embed-skill.sh` and commit the
   regenerated `Sources/Periscope/Generated/EmbeddedSkill.swift`. A test fails when the two
   drift.
-- **Trying a build:** install with `rm` then `cp`, never `cp` over the old binary (macOS
-  caches code signatures per inode and kills an overwritten binary), then
-  `periscope daemon stop` so the next command starts a daemon on the new build.
+- **Trying a build:** run `.build/release/periscope` directly, after `periscope daemon stop`
+  so the next command starts a daemon on the new build. If periscope came from Homebrew,
+  `brew unlink periscope` before putting a build on PATH (`brew link periscope` to go
+  back). Put it there with `rm` then `cp`, never `cp` over the old binary: macOS caches
+  code signatures per inode and kills an overwritten binary.
 - **Wire changes:** bump `periscopeProtocolVersion` whenever `Request`, `Response` or
   `CommandResult` change shape; a mismatched daemon restarts itself.
 - **Commits:** one change per commit, with the reason in the message.

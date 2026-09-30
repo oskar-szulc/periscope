@@ -183,7 +183,7 @@ Fields send those records (not the raw page) to the model. When the model is una
    A slow network looks similar from outside. Each `navigate` has a 30 second default timeout and the script issues up to five, so two minutes of silence with the sandbox off means slow navigations, not a hang. Rerun one `navigate` with `--verbose` to watch events on stderr.
 2. **`NSURLError -1003` / "hostname could not be found".** Machine DNS is down, not periscope. Confirm with `curl -sI https://example.com`.
 3. **`periscope daemon status`** shows live sessions and uptime. A leftover `eqv-daemon-*` session is test residue and harmless.
-4. **Stale results after a rebuild:** installed binary is the repo's `.build/release/periscope`; `cmp` them. Install with `rm` then `cp`, never `cp` over the existing file: macOS caches the code signature per inode and kills the overwritten binary on launch with exit 137.
+4. **Stale binary:** `periscope --version` against the latest release; with Homebrew, `brew upgrade periscope` then `periscope daemon stop`. When testing a local build, run `.build/release/periscope` directly (it starts its own daemon only after `periscope daemon stop`). If you must put a build on PATH, `rm` then `cp`, never `cp` over the existing file: macOS caches the code signature per inode and kills the overwritten binary on launch with exit 137.
 
 ## Rules that prevent most mistakes
 
