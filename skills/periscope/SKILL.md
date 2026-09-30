@@ -53,7 +53,7 @@ What the script encodes, so you don't rediscover it:
 
 Every `navigate` ends with a line like `Status: 404 · Text: 9 chars`. A status of 400 or more, or a text count in single or double digits, means the page is not what you wanted, however normal the title looks. Navigation settles the page first (fetch quiet for 500ms, capped at 5s). If an SPA still shows a tiny count, pass `--wait "selector:<css>"` for something the real content contains. `--wait none` skips settling when speed matters more.
 
-`links --match '<regex>'` filters links by absolute URL, which replaces most post-processing of `text` output.
+`text --no-links` drops link URLs, which are most of a busy page's `text` (onet.pl: 40k characters, 16k without them); images are left out unless `--images`. `links --match '<regex>'` filters links by absolute URL, which replaces most post-processing of `text` output.
 
 ## Target elements the way you see them
 

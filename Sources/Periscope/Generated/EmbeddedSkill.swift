@@ -149,7 +149,7 @@ What the script encodes, so you don't rediscover it:
 
 Every `navigate` ends with a line like `Status: 404 · Text: 9 chars`. A status of 400 or more, or a text count in single or double digits, means the page is not what you wanted, however normal the title looks. Navigation settles the page first (fetch quiet for 500ms, capped at 5s). If an SPA still shows a tiny count, pass `--wait "selector:<css>"` for something the real content contains. `--wait none` skips settling when speed matters more.
 
-`links --match '<regex>'` filters links by absolute URL, which replaces most post-processing of `text` output.
+`text --no-links` drops link URLs, which are most of a busy page's `text` (onet.pl: 40k characters, 16k without them); images are left out unless `--images`. `links --match '<regex>'` filters links by absolute URL, which replaces most post-processing of `text` output.
 
 ## Target elements the way you see them
 
@@ -342,7 +342,9 @@ act on the elements of a blocked page; use `login` to clear it.
 ```bash
 periscope text                           # Page content as markdown (<main>, <article>, or <body>)
 periscope text "<selector>"              # One element as markdown
-periscope text --raw                     # Plain text, no markdown
+periscope text --no-links                # Link text without the URLs: a quarter the size on a busy page
+periscope text --images                  # Keep image markup (left out by default; alt text stays)
+periscope text --raw                     # Plain rendered text, no markdown
 periscope html                           # Full page HTML
 periscope html "<selector>"              # One element's outer HTML
 periscope attr "<selector>" <attribute>  # One attribute value, e.g. href
@@ -353,7 +355,8 @@ periscope elements "<selector>"          # Matching elements with tag, id, class
 ```
 
 Reach for these when you want one specific thing; use `state` when you want to
-orient. `text` is the most token-efficient view of a page's prose.
+orient. `text` is the most token-efficient view of a page's prose. On a busy page most
+of its size is link URLs: onet.pl's front page is 40k characters, 16k with `--no-links`.
 
 ### Native input
 
@@ -601,6 +604,11 @@ rather than a shell: `navigate`, `state`, `text`, `extract`, `links`, `screensho
 image), `click`, `fill`, `type`, `scroll`, `eval`. Each takes an optional `session`
 (default `mcp`) and behaves exactly like the command, since it runs it. It speaks both the
 2026-07-28 protocol and the earlier `initialize`-based ones.
+
+Tool results can outgrow a client's size limit, so `text`, `state`, `extract`, `links` and
+`eval` stop at `max_chars` (default 20,000) and end with
+`[cut: characters 0–20000 of 39900; call again with offset=20000 for more]`. `text` also
+takes `links: false` and `images: true`, like the flags.
 
 ```bash
 claude mcp add periscope -- periscope mcp

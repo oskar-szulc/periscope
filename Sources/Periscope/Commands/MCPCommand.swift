@@ -33,9 +33,11 @@ struct MCPServer {
     static let instructions = """
         A real Safari-engine browser. Start with navigate (it keeps the page open in a named \
         session, default "mcp"), then read with state (what can be clicked), text (the content \
-        as markdown) or extract (the page's repeated items as JSON). Targets are CSS or what a \
-        person sees: "text:Next", "label:Email", "role:button name=Sign in", or @N from state. \
-        A bot-check page fails with "Blocked by"; navigate's wait_challenge gives it time.
+        as markdown) or extract (the page's repeated items as JSON). On a busy page start with \
+        state or extract: text on a news front page runs to tens of thousands of characters. \
+        Long results are cut at max_chars, with the offset to continue from. Targets are CSS or \
+        what a person sees: "text:Next", "label:Email", "role:button name=Sign in", or @N from \
+        state. A bot-check page fails with "Blocked by"; navigate's wait_challenge gives it time.
         """
 
     // MARK: - Tools
@@ -46,7 +48,16 @@ struct MCPServer {
         /// (name, JSON type, description, required)
         var parameters: [(String, String, String, Bool)]
         var arguments: @Sendable ([String: Any]) -> [String]
+        /// Returns text that can outgrow a client's tool-result limit: takes
+        /// max_chars and offset.
+        var paged = false
     }
+
+    static let defaultMaxChars = 20_000
+    static let pagingParameters = [
+        ("max_chars", "integer", "Cut the result at this many characters (default \(defaultMaxChars))", false),
+        ("offset", "integer", "Start at this character, to read on past a cut", false),
+    ]
 
     static let tools: [Tool] = [
         Tool(
@@ -64,11 +75,21 @@ struct MCPServer {
             name: "state",
             description: "The page's URL, headings, content and every clickable element, each with a selector and an @N target.",
             parameters: [("match", "string", "Only elements matching this regex", false)],
-            arguments: { a in ["state"] + opt("--match", a["match"]) }),
+            arguments: { a in ["state"] + opt("--match", a["match"]) }, paged: true),
         Tool(
-            name: "text", description: "The page's main content as markdown, links included.",
-            parameters: [("selector", "string", "Only this element's content", false)],
-            arguments: { a in ["text"] + ((a["selector"] as? String).map { [$0] } ?? []) }),
+            name: "text",
+            description:
+                "The page's main content as markdown. Images are left out (alt text kept); links: false also drops link URLs, which are much of a busy page. On a large page, state or extract is a better start.",
+            parameters: [
+                ("selector", "string", "Only this element's content", false),
+                ("links", "boolean", "Keep link URLs (default true)", false),
+                ("images", "boolean", "Keep image markup (default false)", false),
+            ],
+            arguments: { a in
+                ["text"] + ((a["selector"] as? String).map { [$0] } ?? [])
+                    + ((a["links"] as? Bool) == false ? ["--no-links"] : [])
+                    + ((a["images"] as? Bool ?? false) ? ["--images"] : [])
+            }, paged: true),
         Tool(
             name: "extract",
             description:
@@ -81,11 +102,11 @@ struct MCPServer {
             arguments: { a in
                 ["extract"] + ((a["fields"] as? String).map { [$0] } ?? []) + opt("--items", a["items"])
                     + opt("--from", a["from"])
-            }),
+            }, paged: true),
         Tool(
             name: "links", description: "Every link on the page as an absolute URL.",
             parameters: [("match", "string", "Only URLs matching this regex", false)],
-            arguments: { a in ["links"] + opt("--match", a["match"]) }),
+            arguments: { a in ["links"] + opt("--match", a["match"]) }, paged: true),
         Tool(
             name: "screenshot", description: "A PNG of the page as displayed.",
             parameters: [("full", "boolean", "The whole page, not just the viewport", false)],
@@ -121,7 +142,7 @@ struct MCPServer {
         Tool(
             name: "eval", description: "Run JavaScript in the page and return the result.",
             parameters: [("code", "string", "A JavaScript expression or statements", true)],
-            arguments: { a in ["eval", a["code"] as? String ?? ""] }),
+            arguments: { a in ["eval", a["code"] as? String ?? ""] }, paged: true),
     ]
 
     private static func opt(_ flag: String, _ value: Any?) -> [String] {
@@ -131,7 +152,7 @@ struct MCPServer {
     static let sessionParameter = ("session", "string", "Named browser session; defaults to \"mcp\"", false)
 
     static func schema(_ tool: Tool) -> [String: Any] {
-        let parameters = tool.parameters + [sessionParameter]
+        let parameters = tool.parameters + (tool.paged ? pagingParameters : []) + [sessionParameter]
         var properties: [String: Any] = [:]
         for (name, type, description, _) in parameters { properties[name] = ["type": type, "description": description] }
         return [
@@ -195,7 +216,13 @@ struct MCPServer {
             }
             let session = arguments["session"] as? String ?? "mcp"
             let output = runTool(tool.arguments(arguments) + ["--session", session])
-            return result(Self.toolResult(tool: name, output))
+            var body = Self.toolResult(tool: name, output)
+            if tool.paged {
+                body = Self.paged(
+                    body, offset: arguments["offset"] as? Int ?? 0,
+                    maxChars: arguments["max_chars"] as? Int ?? Self.defaultMaxChars)
+            }
+            return result(body)
         default:
             return Self.error(id, -32601, "Method not found: \(method)")
         }
@@ -216,6 +243,31 @@ struct MCPServer {
         }
         if !warnings.isEmpty { content.append(["type": "text", "text": warnings]) }
         return ["content": content]
+    }
+
+    /// Cuts the first text item to [offset, offset + maxChars) and says where
+    /// it was cut, so an agent reads a busy page in pieces instead of the
+    /// client dropping a result over its size limit (seen: text on onet.pl,
+    /// 60k chars, saved to a file the agent then had to strip with sed).
+    static func paged(_ body: [String: Any], offset: Int, maxChars: Int) -> [String: Any] {
+        guard var content = body["content"] as? [[String: Any]], let text = content.first?["text"] as? String,
+            maxChars > 0
+        else { return body }
+        let total = text.count
+        let start = min(max(offset, 0), total)
+        let end = min(start + maxChars, total)
+        guard start > 0 || end < total else { return body }
+        let from = text.index(text.startIndex, offsetBy: start)
+        let to = text.index(from, offsetBy: end - start)
+        var piece = String(text[from..<to])
+        piece +=
+            end < total
+            ? "\n\n[cut: characters \(start)–\(end) of \(total); call again with offset=\(end) for more]"
+            : "\n\n[characters \(start)–\(end) of \(total); this is the end]"
+        content[0]["text"] = piece
+        var out = body
+        out["content"] = content
+        return out
     }
 
     static func error(_ id: Any, _ code: Int, _ message: String, data: [String: Any]? = nil) -> [String: Any] {

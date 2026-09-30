@@ -82,4 +82,31 @@ struct MCPServerTests {
         #expect(first?["type"] as? String == "image")
         #expect(first?["mimeType"] as? String == "image/png")
     }
+
+    @Test func longResultsArePagedWithAContinuation() {
+        let long = String(repeating: "a", count: 50)
+        let first =
+            call(server(stdout: long), "tools/call", ["name": "text", "arguments": ["max_chars": 20]])["result"] as? [String: Any]
+        let text = (first?["content"] as? [[String: Any]])?.first?["text"] as? String ?? ""
+        #expect(text.hasPrefix(String(repeating: "a", count: 20) + "\n\n[cut: characters 0–20 of 50; call again with offset=20"))
+        let last =
+            call(server(stdout: long), "tools/call", ["name": "text", "arguments": ["max_chars": 20, "offset": 40]])["result"]
+            as? [String: Any]
+        #expect(
+            ((last?["content"] as? [[String: Any]])?.first?["text"] as? String)?.hasSuffix(
+                "[characters 40–50 of 50; this is the end]") == true)
+        // Short results and non-paged tools are untouched.
+        let short = call(server(stdout: "hi"), "tools/call", ["name": "text", "arguments": [:]])["result"] as? [String: Any]
+        #expect((short?["content"] as? [[String: Any]])?.first?["text"] as? String == "hi")
+    }
+
+    @Test func textOptionsMapToFlags() {
+        let calls = Calls()
+        _ = call(server(calls: calls), "tools/call", ["name": "text", "arguments": ["links": false, "images": true]])
+        #expect(calls.last == ["text", "--no-links", "--images", "--session", "mcp"])
+        let tools = (call(server(), "tools/list")["result"] as? [String: Any])?["tools"] as? [[String: Any]] ?? []
+        let props =
+            (tools.first { $0["name"] as? String == "text" }?["inputSchema"] as? [String: Any])?["properties"] as? [String: Any]
+        #expect(props?["max_chars"] != nil && props?["offset"] != nil)
+    }
 }
