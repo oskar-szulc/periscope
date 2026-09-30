@@ -6,6 +6,14 @@ import Testing
 struct HTMLToMarkdownTests {
     let converter = HTMLToMarkdown()
 
+    @Test func imagesOffKeepAltTextAndLinksOffKeepLinkText() {
+        let lean = HTMLToMarkdown(links: false, images: false)
+        #expect(lean.convert("<img src=\"pic.jpg\" alt=\"Photo\">") == "Photo")
+        #expect(lean.convert("<a href=\"/a\">Read more</a>") == "Read more")
+        // An image-only link keeps a usable link text.
+        #expect(HTMLToMarkdown(images: false).convert("<a href=\"/p\"><img src=\"x.jpg\" alt=\"Story\"></a>") == "[Story](/p)")
+    }
+
     @Test func headings() {
         #expect(converter.convert("<h1>Title</h1>") == "# Title")
         #expect(converter.convert("<h2>Subtitle</h2>") == "## Subtitle")

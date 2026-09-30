@@ -1,6 +1,11 @@
 import Foundation
 
 struct HTMLToMarkdown: Sendable {
+    /// Link targets: `[text](url)`, or just `text` when off.
+    var links = true
+    /// Image markup: `![alt](src)`, or just the alt text when off. On a news
+    /// front page images were a third of the output and almost never read.
+    var images = true
 
     func convert(_ html: String) -> String {
         var text = html
@@ -62,30 +67,27 @@ struct HTMLToMarkdown: Sendable {
             options: .regularExpression
         )
 
-        // 8. Convert links (a href)
-        text = text.replacingOccurrences(
-            of: #"<a[^>]*\shref="([^"]*)"[^>]*>(.*?)</a>"#,
-            with: "[$2]($1)",
-            options: .regularExpression
-        )
-        // Also handle single-quoted href
-        text = text.replacingOccurrences(
-            of: #"<a[^>]*\shref='([^']*)'[^>]*>(.*?)</a>"#,
-            with: "[$2]($1)",
-            options: .regularExpression
-        )
-
-        // 9. Convert images (img src alt)
+        // 8. Convert images (img src alt) before links, so an image inside a
+        // link becomes the link's text when images are off.
         text = text.replacingOccurrences(
             of: #"<img[^>]*\salt="([^"]*)"[^>]*\ssrc="([^"]*)"[^>]*/?>"#,
-            with: "![$1]($2)",
+            with: images ? "![$1]($2)" : "$1",
             options: .regularExpression
         )
         text = text.replacingOccurrences(
             of: #"<img[^>]*\ssrc="([^"]*)"[^>]*\salt="([^"]*)"[^>]*/?>"#,
-            with: "![$2]($1)",
+            with: images ? "![$2]($1)" : "$2",
             options: .regularExpression
         )
+
+        // 9. Convert links (a href), double- and single-quoted
+        for quote in ["\"", "'"] {
+            text = text.replacingOccurrences(
+                of: #"<a[^>]*\shref=Q([^Q]*)Q[^>]*>(.*?)</a>"#.replacingOccurrences(of: "Q", with: quote),
+                with: links ? "[$2]($1)" : "$2",
+                options: .regularExpression
+            )
+        }
 
         // 10. Convert line breaks (br)
         text = text.replacingOccurrences(

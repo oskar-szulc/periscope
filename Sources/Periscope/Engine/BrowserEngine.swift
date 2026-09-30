@@ -589,27 +589,20 @@ final class BrowserEngine {
         return records
     }
 
-    func extractText(selector: String?, raw: Bool) async throws -> String {
-        let js: String
-        if let selector {
-            js = """
-                (function() {
-                    var el = document.querySelector(\(ElementResolver.jsString(selector)));
-                    return el ? el.innerHTML : null;
-                })();
-                """
-        } else {
-            js = """
-                (function() {
-                    var el = \(PageSummarizer.mainContentExpr);
-                    return el ? el.innerHTML : '';
-                })();
-                """
-        }
-        guard let html = try await runJavaScript(js) as? String else {
+    /// `raw` is the rendered plain text (innerText); otherwise markdown, with
+    /// link targets and image markup as `converter` says.
+    func extractText(selector: String?, raw: Bool, converter: HTMLToMarkdown = HTMLToMarkdown()) async throws -> String {
+        let root = selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" } ?? PageSummarizer.mainContentExpr
+        let js = """
+            (function() {
+                var el = \(root);
+                return el ? el.\(raw ? "innerText" : "innerHTML") : null;
+            })();
+            """
+        guard let content = try await runJavaScript(js) as? String else {
             throw PeriscopeError.elementNotFound(selector: selector ?? "body")
         }
-        return raw ? html : HTMLToMarkdown().convert(html)
+        return raw ? content : converter.convert(content)
     }
 
     func extractHTML(selector: String?) async throws -> String {

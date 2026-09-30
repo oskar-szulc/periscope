@@ -7,11 +7,14 @@ struct Extract: ParsableCommand {
         abstract: "Extract text content as markdown")
     @OptionGroup var globals: GlobalOptions
     @Argument(help: "CSS selector (optional)") var selector: String?
-    @Flag(name: .long, help: "Raw text, no markdown") var raw: Bool = false
+    @Flag(name: .long, help: "Plain rendered text, no markdown") var raw: Bool = false
+    @Flag(name: .long, help: "Include image markup (off by default; alt text is kept)") var images: Bool = false
+    @Flag(name: .long, help: "Drop link targets, keeping the link text (use links or state for URLs)") var noLinks: Bool = false
 
     func run() throws {
+        let converter = HTMLToMarkdown(links: !noLinks, images: images)
         CommandRunner.run(globals: globals) { engine in
-            let content = try await engine.extractText(selector: selector, raw: raw)
+            let content = try await engine.extractText(selector: selector, raw: raw, converter: converter)
             return .extract(content: content)
         }
     }
