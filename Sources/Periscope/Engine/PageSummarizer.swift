@@ -11,11 +11,12 @@ enum PageSummarizer {
     static let elementLimit = 80
 
     /// JS expression for the page's main content root: the `<main>` with the
-    /// most text, else `<article>`, else `<body>`. Not simply the first
-    /// `<main>`: Next.js layouts can put an empty shell `<main>` ahead of the
-    /// one holding the content, and picking it yields an empty page.
+    /// most text, else the page's only `<article>`, else `<body>`. Not simply
+    /// the first `<main>`: Next.js layouts can put an empty shell `<main>` ahead
+    /// of the one holding the content. Not the first of several `<article>`s:
+    /// on a listing page those are cards, and it read as one product.
     static let mainContentExpr = """
-        (Array.from(document.querySelectorAll('main')).sort(function(a, b) { return b.textContent.length - a.textContent.length; })[0] || document.querySelector('article') || document.body)
+        (Array.from(document.querySelectorAll('main')).sort(function(a, b) { return b.textContent.length - a.textContent.length; })[0] || (document.querySelectorAll('article').length === 1 ? document.querySelector('article') : null) || document.body)
         """
 
     /// JavaScript that extracts a structured page summary from the DOM.
