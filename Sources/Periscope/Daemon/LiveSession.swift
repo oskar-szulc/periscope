@@ -79,6 +79,11 @@ actor LiveSession {
         return pendingWarnings
     }
 
+    /// Tear down without flushing: for a session whose page is wedged.
+    func abandon() async {
+        await MainActor.run { engine.close() }
+    }
+
     /// Flush to disk and tear down. Called on eviction and on daemon shutdown --
     /// the snapshot is the durability layer, the live page is the source of truth.
     func shutdown() async {

@@ -73,6 +73,17 @@ actor SessionRegistry {
         await entry.session.shutdown()
     }
 
+    /// After a timeout: the abandoned command may hold the session forever (its
+    /// lock is released only when it finishes), so every later command would
+    /// queue behind it. Drop it without saving, since saving runs JS on the
+    /// wedged page; the next command cold-starts from the last snapshot.
+    func discard(_ session: LiveSession) async {
+        let name = await session.name
+        guard let entry = entries[name], entry.session === session else { return }
+        entries[name] = nil
+        await entry.session.abandon()
+    }
+
     func touch(_ name: String) {
         entries[name]?.lastUsed = Date()
     }

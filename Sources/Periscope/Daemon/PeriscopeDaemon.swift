@@ -210,6 +210,10 @@ final class PeriscopeDaemon: @unchecked Sendable {
         } catch let error as PeriscopeError {
             if case .timeout = error {
                 warnings.append("Page at timeout: \(await session.locationDescription())")
+                if !options.noSession {
+                    await registry.discard(session)
+                    warnings.append("Session '\(options.session)' was reset so the next command does not wait on this one; it restarts from its last saved state, so navigate again before reading.")
+                }
             }
             response = .failure(ErrorPayload(error), warnings: warnings)
         } catch {
