@@ -4,6 +4,11 @@ struct PeriscopeRoot: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "periscope",
         abstract: "A headless browser CLI for agents.",
+        discussion: """
+            Agents: `periscope docs` prints the full reference; `periscope install-skill` adds \
+            the agent skill to a project. Start with `periscope navigate <url> --session <name>`, \
+            then `state`, `text` or `extract`.
+            """,
         version: "0.1.1",
         subcommands: [
             Navigate.self, Back.self, Forward.self,
@@ -19,7 +24,7 @@ struct PeriscopeRoot: ParsableCommand {
             Query.self, Find.self,
             Wait.self, Elements.self, State.self,
             Requests.self, Console.self,
-            Serve.self, DaemonGroup.self, InstallSkill.self,
+            Serve.self, DaemonGroup.self, InstallSkill.self, Docs.self,
         ]
     )
 }

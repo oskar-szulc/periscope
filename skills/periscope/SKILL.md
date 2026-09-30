@@ -7,7 +7,7 @@ description: Use when a task needs a real browser from the shell - Google search
 
 Headless WebKit (Safari engine) CLI, `periscope` on PATH. Genuine Safari fingerprint, persistent named sessions held by a background daemon.
 
-**Command reference (read it for syntax):** `periscope help <command>`, and the full reference in `PERISCOPE.md` in the periscope repo. This skill covers what that reference does not: when to use it, how to search Google with it, and the failures seen in practice.
+**Command reference (read it for syntax):** `periscope docs` prints the full reference; `periscope help <command>` gives one command's flags. This skill covers what that reference does not: when to use it, how to search Google with it, and the failures seen in practice.
 
 ## Periscope vs built-in tools
 

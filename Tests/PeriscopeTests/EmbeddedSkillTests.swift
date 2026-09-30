@@ -5,11 +5,11 @@ import Testing
 
 @Suite("embedded skill")
 struct EmbeddedSkillTests {
-    /// Fails when skill/ was edited without running scripts/embed-skill.sh.
+    /// Fails when skills/periscope/ was edited without running scripts/embed-skill.sh.
     @Test func matchesTheSkillFolder() throws {
         let skill = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("skill")
+            .appendingPathComponent("skills/periscope")
         let onDisk = try FileManager.default.subpathsOfDirectory(atPath: skill.path)
             .filter { !$0.hasSuffix(".DS_Store") }
             .filter {
@@ -22,5 +22,12 @@ struct EmbeddedSkillTests {
             let actual = try String(contentsOf: skill.appendingPathComponent(file.path), encoding: .utf8)
             #expect(actual == file.contents + "\n", "\(file.path) drifted: run scripts/embed-skill.sh")
         }
+    }
+
+    @Test func referenceMatchesPeriscopeMD() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let actual = try String(contentsOf: root.appendingPathComponent("PERISCOPE.md"), encoding: .utf8)
+        #expect(actual == EmbeddedSkill.reference + "\n", "PERISCOPE.md drifted: run scripts/embed-skill.sh")
     }
 }

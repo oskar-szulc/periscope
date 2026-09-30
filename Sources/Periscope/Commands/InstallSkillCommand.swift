@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 
-/// Writes the embedded skill (skill/ at build time) where an agent finds it,
+/// Writes the embedded skill (skills/periscope/ at build time) where an agent finds it,
 /// so a Homebrew or release install needs no clone of this repo.
 struct InstallSkill: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -23,7 +23,7 @@ struct InstallSkill: ParsableCommand {
 
         for root in roots {
             let dir = base.appendingPathComponent(root).appendingPathComponent("periscope")
-            // A symlinked skill (a checkout's skill/ linked in) is its own
+            // A symlinked skill (a checkout's skills/periscope/ linked in) is its own
             // source of truth; writing through it would edit that checkout.
             if let target = try? FileManager.default.destinationOfSymbolicLink(atPath: dir.path) {
                 print("skipped \(dir.path): a symlink to \(target)")
@@ -40,5 +40,16 @@ struct InstallSkill: ParsableCommand {
             }
             print("installed \(dir.path)")
         }
+    }
+}
+
+/// The full reference, built into the binary: a Homebrew install has no checkout
+/// to read PERISCOPE.md from, and agents look in `--help` first.
+struct Docs: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Print the full command reference (PERISCOPE.md), written for agents")
+
+    func run() throws {
+        print(EmbeddedSkill.reference)
     }
 }

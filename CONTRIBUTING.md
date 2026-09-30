@@ -8,9 +8,9 @@ swift test             # includes tests that load real pages in WebKit
 ./scripts/lint.sh      # swift-format, strict; ./scripts/format.sh fixes it
 ```
 
-- **Skill changes:** edit `skill/`, then run `./scripts/embed-skill.sh` and commit the
-  regenerated `Sources/Periscope/Generated/EmbeddedSkill.swift`. A test fails when the two
-  drift.
+- **Skill or reference changes:** edit `skills/periscope/` or `PERISCOPE.md`, then run
+  `./scripts/embed-skill.sh` and commit the regenerated
+  `Sources/Periscope/Generated/EmbeddedSkill.swift`. A test fails when they drift.
 - **Trying a build:** run `.build/release/periscope` directly, after `periscope daemon stop`
   so the next command starts a daemon on the new build. If periscope came from Homebrew,
   `brew unlink periscope` before putting a build on PATH (`brew link periscope` to go
