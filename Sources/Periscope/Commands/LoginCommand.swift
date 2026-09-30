@@ -120,8 +120,7 @@ struct Login: ParsableCommand {
         // Save session
         if !noSession {
             try await SessionRestore.save(
-                engine: engine, session: sessionName,
-                viewport: viewportStr, fallbackURL: urlString)
+                engine: engine, session: sessionName, fallbackURL: urlString)
         }
 
         print(

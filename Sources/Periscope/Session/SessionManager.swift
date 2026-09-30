@@ -1,72 +1,35 @@
 import Foundation
 
+/// Older snapshots also carry title, viewport, timestamp and origin; nothing
+/// read them back, and decoding ignores them.
 struct SessionState: Codable {
     let url: String
-    let title: String?
-    let viewport: String
-    var timestamp: String?
 }
 
 struct PersistedStorage: Codable {
-    let origin: String
     let localStorage: [String: String]
 }
 
 struct SessionManager {
-    let baseDir: URL
-
-    init(baseDir: URL? = nil) {
-        if let baseDir {
-            self.baseDir = baseDir
-        } else {
-            self.baseDir = DaemonPaths.base.appendingPathComponent("sessions")
-        }
-    }
+    var baseDir = DaemonPaths.base.appendingPathComponent("sessions")
 
     private func sessionDir(_ name: String) -> URL {
         baseDir.appendingPathComponent(name)
     }
 
-    func saveState(_ state: SessionState, session: String) throws {
-        let dir = sessionDir(session)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        var s = state
-        s.timestamp = ISO8601DateFormatter().string(from: Date())
-        let data = try JSONEncoder().encode(s)
-        try data.write(to: dir.appendingPathComponent("state.json"))
-    }
-
-    func loadState(session: String) throws -> SessionState? {
-        let file = sessionDir(session).appendingPathComponent("state.json")
-        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
-        return try JSONDecoder().decode(SessionState.self, from: Data(contentsOf: file))
-    }
-
-    func saveCookies(_ cookies: [PersistedCookie], session: String) throws {
-        let dir = sessionDir(session)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let data = try CookieStore.serialize(CookieStore.pruneExpired(cookies))
-        try data.write(to: dir.appendingPathComponent("cookies.json"))
-    }
-
-    func loadCookies(session: String) throws -> [PersistedCookie] {
-        let file = sessionDir(session).appendingPathComponent("cookies.json")
-        guard FileManager.default.fileExists(atPath: file.path) else { return [] }
-        return try CookieStore.deserialize(Data(contentsOf: file))
-    }
-
-    func saveStorage(_ storage: PersistedStorage, session: String) throws {
+    /// One JSON file of a session's snapshot: state.json, cookies.json or storage.json.
+    func write(_ value: some Encodable, _ file: String, session: String) throws {
         let dir = sessionDir(session)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(storage).write(to: dir.appendingPathComponent("storage.json"))
+        try encoder.encode(value).write(to: dir.appendingPathComponent(file))
     }
 
-    func loadStorage(session: String) throws -> PersistedStorage? {
-        let file = sessionDir(session).appendingPathComponent("storage.json")
-        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
-        return try JSONDecoder().decode(PersistedStorage.self, from: Data(contentsOf: file))
+    func read<T: Decodable>(_ type: T.Type, _ file: String, session: String) throws -> T? {
+        let url = sessionDir(session).appendingPathComponent(file)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return try JSONDecoder().decode(T.self, from: Data(contentsOf: url))
     }
 
     func listSessions() throws -> [String] {

@@ -23,12 +23,13 @@ enum SessionRestore {
     @MainActor
     static func restore(engine: BrowserEngine, session: String) async throws -> String? {
         let manager = SessionManager()
-        let cookies = try manager.loadCookies(session: session).compactMap(\.httpCookie)
+        let cookies = try (manager.read([PersistedCookie].self, "cookies.json", session: session) ?? [])
+            .compactMap(\.httpCookie)
         if !cookies.isEmpty {
             await engine.setCookies(cookies)
         }
 
-        guard let state = try manager.loadState(session: session),
+        guard let state = try manager.read(SessionState.self, "state.json", session: session),
             let url = URL(string: state.url)
         else { return nil }
 
@@ -39,33 +40,26 @@ enum SessionRestore {
                 + "(\(error.description)); cookies restored, storage not"
         }
 
-        if let storage = try manager.loadStorage(session: session) {
-            try await engine.runJavaScriptVoid(StorageManager.injectionScript(for: storage))
+        if let storage = try manager.read(PersistedStorage.self, "storage.json", session: session) {
+            let json = String(decoding: try JSONEncoder().encode(storage.localStorage), as: UTF8.self)
+            try await engine.runJavaScriptVoid(
+                "Object.entries(\(json)).forEach(([k, v]) => localStorage.setItem(k, v))")
         }
         return nil
     }
 
     @MainActor
-    static func save(
-        engine: BrowserEngine, session: String,
-        viewport: String = "1920x1080", fallbackURL: String? = nil
-    ) async throws {
+    static func save(engine: BrowserEngine, session: String, fallbackURL: String? = nil) async throws {
         let manager = SessionManager()
 
         let cookies = await engine.allCookies().map(PersistedCookie.init)
-        try manager.saveCookies(cookies, session: session)
+        try manager.write(CookieStore.pruneExpired(cookies), "cookies.json", session: session)
 
         guard let url = engine.currentURL ?? fallbackURL else { return }
-        try manager.saveState(
-            SessionState(url: url, title: engine.currentTitle, viewport: viewport),
-            session: session)
+        try manager.write(SessionState(url: url), "state.json", session: session)
 
-        if let json = try await engine.runJavaScript(StorageManager.extractionScript()) as? String,
-            let data = json.data(using: .utf8),
-            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String]
-        {
-            let origin = URL(string: url).map { "\($0.scheme ?? "https")://\($0.host ?? "")" } ?? url
-            try manager.saveStorage(PersistedStorage(origin: origin, localStorage: dict), session: session)
+        if let dict: [String: String] = try await engine.runJavaScriptDecoded("JSON.stringify({...localStorage})") {
+            try manager.write(PersistedStorage(localStorage: dict), "storage.json", session: session)
         }
     }
 }

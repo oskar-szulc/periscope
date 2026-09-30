@@ -5,7 +5,7 @@ import Testing
 
 @Suite("CookieStore")
 struct CookieStoreTests {
-    @Test func serializeAndDeserialize() throws {
+    @Test func roundTripsThroughTheSessionDirectory() throws {
         let cookies = [
             PersistedCookie(
                 name: "session_id", value: "abc123", domain: ".example.com",
@@ -14,8 +14,9 @@ struct CookieStoreTests {
                 name: "theme", value: "dark", domain: "example.com",
                 path: "/", expires: nil, secure: false, httpOnly: false),
         ]
-        let data = try CookieStore.serialize(cookies)
-        let decoded = try CookieStore.deserialize(data)
+        let manager = SessionManager(baseDir: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        try manager.write(cookies, "cookies.json", session: "s")
+        let decoded = try #require(try manager.read([PersistedCookie].self, "cookies.json", session: "s"))
         #expect(decoded.count == 2)
         #expect(decoded[0].name == "session_id")
         #expect(decoded[0].secure == true)
