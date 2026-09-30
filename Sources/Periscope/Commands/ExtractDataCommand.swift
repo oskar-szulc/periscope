@@ -50,12 +50,13 @@ struct ExtractData: ParsableCommand {
 
         CommandRunner.run(globals: globals) { engine in
             let records = try await engine.pageRecords(from: from, items: items)
-            guard let query else { return .rawJSON(Self.json(records)) }
+            let recordsResult = CommandResult.rawJSON(Self.json(records))
+            guard let query else { return recordsResult }
 
             guard SystemLanguageModel.default.isAvailable else {
                 FileHandle.standardError.write(Data(
                     "Apple Intelligence unavailable; returning the page's records instead of extracted fields.\n".utf8))
-                return .rawJSON(Self.json(records))
+                return recordsResult
             }
             let content = PageRecords.modelInput(records)
             if content.isEmpty {
@@ -70,7 +71,7 @@ struct ExtractData: ParsableCommand {
             } catch PeriscopeError.timeout {
                 FileHandle.standardError.write(Data(
                     "The on-device model did not answer within \(modelSeconds)s; returning the page's records instead.\n".utf8))
-                return .rawJSON(Self.json(records))
+                return recordsResult
             }
         }
     }
@@ -108,8 +109,7 @@ struct ExtractData: ParsableCommand {
             arrays.append(Extraction.itemsFromResult(response.content.jsonString))
         }
         let merged = Extraction.mergeItems(arrays)
-        let data = try JSONSerialization.data(withJSONObject: merged, options: [.prettyPrinted])
-        return .rawJSON(String(data: data, encoding: .utf8) ?? "[]")
+        return .rawJSON(Self.json(merged))
     }
 
     /// Natural-language description -> free-form JSON. Free JSON cannot be merged
@@ -146,7 +146,6 @@ struct ExtractData: ParsableCommand {
         if let data = s.data(using: .utf8), (try? JSONSerialization.jsonObject(with: data)) != nil {
             return s
         }
-        let wrapped = try? JSONSerialization.data(withJSONObject: ["text": raw], options: [])
-        return wrapped.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        return json(["text": raw])
     }
 }

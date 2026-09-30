@@ -12,28 +12,28 @@ import Foundation
 /// - `text`: the readable content, only when no items were found (an article
 ///   or a detail page), so the result is never empty-handed.
 enum PageRecords {
-    /// A group needs this many siblings to count as a list of records.
-    static let minItems = 3
-    /// A record has at least this many separate text pieces (title, company,
-    /// location...), or one fewer plus a link (rank + linked title). Unlinked
-    /// two-piece rows (label/value) are layout, not records; one-piece items
-    /// are chips, menu entries, paragraphs.
-    static let minParts = 3
-    static let itemLimit = 500
-
     /// JS returning `{title, url, structured, items, itemSelector, next, text?}`.
     /// `from` scopes item detection (structured data is page-level, it lives in
     /// the head); `items` skips detection and uses that selector as the records.
+    /// Both accept any target `state` prints (CSS, text:, role:...), resolved by
+    /// the page's `window.__periscope`.
     static func script(from: String?, items: String?) -> String {
         let fromJS = from.map(ElementResolver.jsString) ?? "null"
         let itemsJS = items.map(ElementResolver.jsString) ?? "null"
         return """
         (function() {
-            var FROM = \(fromJS), ITEMS = \(itemsJS);
-            var MIN_ITEMS = \(minItems), MIN_PARTS = \(minParts), ITEM_LIMIT = \(itemLimit);
-            var root = FROM ? document.querySelector(FROM) : document.body;
+            var P = window.__periscope, FROM = \(fromJS), ITEMS = \(itemsJS);
+            // A group needs MIN_ITEMS siblings to count as a list. A record has
+            // MIN_PARTS text pieces (title, company, location...), or one fewer
+            // plus a link (rank + linked title): unlinked two-piece rows are
+            // label/value layout; one-piece items are chips, menu entries,
+            // paragraphs.
+            var MIN_ITEMS = 3, MIN_PARTS = 3, ITEM_LIMIT = 500;
+            var root = FROM ? P.query(FROM)[0] : document.body;
             if (!root) return null;
-            var SKIP = 'nav, header, footer, aside, script, style, noscript, template, select, svg';
+            var HIDDEN = 'script, style, noscript, template';
+            var SKIP = 'nav, header, footer, aside, select, svg, ' + HIDDEN;
+            function clean(s) { return s.replace(/\\s+/g, ' ').trim(); }
 
             // --- structured data -------------------------------------------
             var structured = [];
@@ -53,7 +53,7 @@ enum PageRecords {
                 if (p.matches('img, audio, video, source, iframe, embed')) return p.src;
                 if (p.matches('time[datetime]')) return p.getAttribute('datetime');
                 if (p.matches('data, meter')) return p.getAttribute('value');
-                return p.textContent.replace(/\\s+/g, ' ').trim();
+                return clean(p.textContent);
             }
             function microdata(scope) {
                 var o = {};
@@ -82,7 +82,9 @@ enum PageRecords {
             // elements with no whitespace between them are styled apart
             // (margins, badges), so they split too.
             var FORMATTING = /^(EM|STRONG|B|I|U|S|MARK|CODE|KBD|ABBR|SUB|SUP|SMALL|Q|CITE|DFN|TIME)$/;
-            var displays = new Map();
+            // Groups nest (sections, cards, rows), so the same elements are
+            // measured once per level: cache layout answers and parts per element.
+            var displays = new Map(), visibility = new Map(), partsCache = new Map();
             function blockOf(el) {
                 for (; el && el !== root; el = el.parentElement) {
                     var d = displays.get(el);
@@ -91,16 +93,25 @@ enum PageRecords {
                 }
                 return root;
             }
+            function isVisible(el) {
+                var v = visibility.get(el);
+                if (v === undefined) { v = !el.checkVisibility || el.checkVisibility(); visibility.set(el, v); }
+                return v;
+            }
+            var skipHidden = { acceptNode: function(n) {
+                return n.nodeType === 1 && n.matches(HIDDEN) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+            } };
             function parts(el) {
+                if (partsCache.has(el)) return partsCache.get(el);
                 var out = [], buf = '', block = null, prev = null, n;
-                function flush() { var t = buf.replace(/\\s+/g, ' ').trim(); if (t) out.push(t); buf = ''; }
-                var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+                function flush() { var t = clean(buf); if (t) out.push(t); buf = ''; }
+                var w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, skipHidden);
                 while ((n = w.nextNode())) {
                     if (n.nodeType === 1) { if (n.tagName === 'BR') flush(); continue; }
                     var p = n.parentElement, text = n.textContent;
-                    if (!p || p.closest('script, style, noscript, template')) continue;
+                    if (!p) continue;
                     if (!text.trim()) { if (buf) buf += ' '; continue; }  // the space between two <em>s
-                    if (p.checkVisibility && !p.checkVisibility()) continue;
+                    if (!isVisible(p)) continue;
                     var b = blockOf(p);
                     var flows = /\\s$/.test(buf) || /^\\s/.test(text) || !prev ||
                         p.contains(prev) || prev.contains(p) ||
@@ -109,6 +120,7 @@ enum PageRecords {
                     buf += text; block = b; prev = p;
                 }
                 flush();
+                partsCache.set(el, out);
                 return out;
             }
             function sig(el) {
@@ -125,7 +137,7 @@ enum PageRecords {
 
             var chosen = null, selector = null;
             if (ITEMS) {
-                chosen = Array.from(root.querySelectorAll(ITEMS));
+                chosen = P.query(ITEMS).filter(function(e) { return root.contains(e); });
                 selector = ITEMS;
             } else {
                 // Siblings sharing a tag+class signature, pooled page-wide by
@@ -135,14 +147,16 @@ enum PageRecords {
                 [root].concat(Array.from(root.querySelectorAll('*'))).forEach(function(parent) {
                     if (inSkipped(parent)) return;
                     var bySig = {};
+                    // The parent passed, so only the child itself can be chrome.
                     Array.from(parent.children).forEach(function(c) {
-                        if (inSkipped(c)) return;
-                        (bySig[sig(c)] = bySig[sig(c)] || []).push(c);
+                        if (c.matches(SKIP)) return;
+                        var k = sig(c);
+                        (bySig[k] = bySig[k] || []).push(c);
                     });
                     Object.keys(bySig).forEach(function(k) {
                         if (bySig[k].length < 2) return;
                         var key = sig(parent) + ' > ' + k;
-                        groups[key] = (groups[key] || []).concat(bySig[k]);
+                        Array.prototype.push.apply(groups[key] = groups[key] || [], bySig[k]);
                     });
                 });
                 // Pooling by signature can catch nested layout (table rows
@@ -162,7 +176,7 @@ enum PageRecords {
                     var rich = 0, len = 0;
                     els.forEach(function(e) {
                         var ps = parts(e);
-                        if (ps.length >= MIN_PARTS || (ps.length >= 2 && e.querySelector('a[href]'))) rich++;
+                        if (ps.length >= MIN_PARTS || (ps.length >= MIN_PARTS - 1 && e.querySelector('a[href]'))) rich++;
                         len += Math.min(ps.join(' ').length, 300);
                     });
                     // Total text with each record capped: many substantial
@@ -172,17 +186,18 @@ enum PageRecords {
                 candidates.sort(function(a, b) { return b.len - a.len; });
                 var best = candidates[0];
                 // Wrappers (sections of cards) still carry all their records'
-                // text. Descend while an inner group has more records and
-                // covers most of the text.
-                for (var moved = true; best && moved;) {
-                    moved = false;
-                    for (var i = 0; i < candidates.length; i++) {
-                        var c = candidates[i];
-                        if (c.els.length > best.els.length && c.len * 2 >= best.len &&
-                            c.els.every(function(e) { return best.els.some(function(w) { return w !== e && w.contains(e); }); })) {
-                            best = c; moved = true; break;
-                        }
-                    }
+                // text. Descend while an inner group has more records, covers
+                // most of the text, and sits wholly inside the current one.
+                function insideBest(e) {
+                    for (var a = e.parentElement; a; a = a.parentElement) if (wrappers.has(a)) return true;
+                    return false;
+                }
+                for (var wrappers, inner; best; best = inner) {
+                    wrappers = new Set(best.els);
+                    inner = candidates.find(function(c) {
+                        return c.els.length > best.els.length && c.len * 2 >= best.len && c.els.every(insideBest);
+                    });
+                    if (!inner) break;
                 }
                 if (best) { chosen = best.els; selector = best.key; }
             }
@@ -194,7 +209,7 @@ enum PageRecords {
                 var seen = {}, links = [];
                 (el.matches('a[href]') ? [el] : []).concat(Array.from(el.querySelectorAll('a[href]'))).forEach(function(a) {
                     if (!/^https?:/.test(a.href)) return;
-                    var text = a.textContent.replace(/\\s+/g, ' ').trim();
+                    var text = clean(a.textContent);
                     // An image link and a title link often share a URL; keep the words.
                     if (seen[a.href]) { if (!seen[a.href].text) seen[a.href].text = text; return; }
                     links.push(seen[a.href] = { text: text, url: a.href });
@@ -206,10 +221,10 @@ enum PageRecords {
                 var table = el.tagName === 'TR' && el.closest('table');
                 var head = table && (table.querySelector('thead tr') || table.querySelector('tr'));
                 if (head && head !== el && head.querySelector('th')) {
-                    var names = Array.from(head.children).map(function(c) { return c.textContent.replace(/\\s+/g, ' ').trim(); });
+                    var names = Array.from(head.children).map(function(c) { return clean(c.textContent); });
                     var fields = {};
                     Array.from(el.children).forEach(function(c, i) {
-                        if (names[i]) fields[names[i]] = c.textContent.replace(/\\s+/g, ' ').trim();
+                        if (names[i]) fields[names[i]] = clean(c.textContent);
                     });
                     item.fields = fields;
                 }
@@ -220,7 +235,7 @@ enum PageRecords {
             var next = document.querySelector('link[rel="next"], a[rel~="next"]');
             if (!next) {
                 next = Array.from(document.querySelectorAll('a[href]')).find(function(a) {
-                    var t = (a.textContent + ' ' + (a.getAttribute('aria-label') || '')).replace(/\\s+/g, ' ').trim();
+                    var t = clean(a.textContent + ' ' + (a.getAttribute('aria-label') || ''));
                     return /^(?:(?:next(?: page)?|older posts)\\s*[›»→]?|[›»→])$/i.test(t);
                 });
             }

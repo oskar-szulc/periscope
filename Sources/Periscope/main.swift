@@ -7,7 +7,7 @@ do {
     var command = try PeriscopeRoot.parseAsRoot()
     try command.run()
 } catch let error as PeriscopeError {
-    FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
+    FileHandle.standardError.write(Data((TextFormatter().formatError(ErrorPayload(error)) + "\n").utf8))
     exit(error.exitCode)
 } catch {
     PeriscopeRoot.exit(withError: error)

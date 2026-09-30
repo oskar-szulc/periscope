@@ -10,7 +10,7 @@ struct GlobalOptions: ParsableArguments {
     @Flag(name: .long, help: "Output as JSON")
     var json: Bool = false
 
-    @Option(name: .long, help: "Timeout in seconds")
+    @Option(name: .long, help: "Timeout in seconds (0: no limit)")
     var timeout: Int = 30
 
     @Option(name: .long, help: "Viewport size (WxH)")

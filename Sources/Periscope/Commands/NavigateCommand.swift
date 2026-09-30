@@ -61,7 +61,7 @@ struct Navigate: ParsableCommand {
         guard let parsedURL = URL(string: url) else {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
-        if waitChallenge > 0 && waitChallenge + 10 > globals.timeout {
+        if waitChallenge > 0 && globals.timeout > 0 && waitChallenge + 10 > globals.timeout {
             throw PeriscopeError.argumentError(
                 reason: "--wait-challenge \(waitChallenge) needs --timeout of at least \(waitChallenge + 10) to leave room for the load")
         }

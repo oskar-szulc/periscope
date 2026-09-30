@@ -11,6 +11,8 @@ private func records(_ body: String, head: String = "", from: String? = nil,
     let page = WebPage()
     let html = "<html><head><title>T</title>\(head)</head><body>\(body)</body></html>"
     for try await _ in page.load(html: html, baseURL: URL(string: "https://shop.test/list")!) {}
+    // The real window installs this as a user script at document start.
+    _ = try await page.callJavaScript(ElementResolver.installScript)
     let result = try await page.callJavaScript("return " + PageRecords.script(from: from, items: items))
     return try #require(result as? [String: Any])
 }
@@ -129,6 +131,9 @@ struct PageRecordsTests {
         #expect(itemTexts(explicit) == [["one"], ["two"]])
         let scoped = try await records(chrome + body, from: "#b")
         #expect(itemTexts(scoped).count == 3)
+        // Same targets as every other command, not just CSS.
+        let semantic = try await records(body, items: "role:heading")
+        #expect(itemTexts(semantic) == [["Engineer 1"], ["Engineer 2"], ["Engineer 3"]])
     }
 
     @Test func modelInputIsOneLinePerRecord() {

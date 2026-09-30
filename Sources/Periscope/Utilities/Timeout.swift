@@ -2,16 +2,18 @@ import Foundation
 import Synchronization
 
 /// Runs `operation`, throwing `PeriscopeError.timeout` if it has not finished
-/// after `seconds`.
+/// after `seconds`. Zero or less means no limit (`--timeout 0`).
 ///
 /// Not a task group: a group waits for every child before returning, so an
 /// operation that ignores cancellation (FoundationModels' `respond()` hangs this
 /// way) held the caller past its deadline, forever in the worst case. Here the
-/// loser is cancelled and abandoned instead.
+/// loser is cancelled and abandoned instead; an abandoned operation keeps what
+/// it captured alive until it returns.
 func withTimeout<T: Sendable>(
     seconds: Int,
     operation: @escaping @Sendable () async throws -> T
 ) async throws -> T {
+    if seconds <= 0 { return try await operation() }
     let race = Race<T>()
     return try await withTaskCancellationHandler {
         try await withCheckedThrowingContinuation { continuation in
@@ -33,25 +35,22 @@ private final class Race<T: Sendable>: Sendable {
 
     func start(_ continuation: CheckedContinuation<T, Error>, seconds: Int,
                operation: @escaping @Sendable () async throws -> T) {
-        let cancelledEarly = state.withLock { s in
-            if !s.done { s.continuation = continuation }
-            return s.done
+        // One lock for the whole setup: a task that finishes at once waits
+        // here briefly instead of racing a half-built state.
+        state.withLock { s in
+            guard !s.done else { continuation.resume(throwing: CancellationError()); return }
+            s.continuation = continuation
+            s.tasks = [
+                Task {
+                    do { self.finish(.success(try await operation())) }
+                    catch { self.finish(.failure(error)) }
+                },
+                Task {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    self.finish(.failure(PeriscopeError.timeout(seconds: seconds)))
+                },
+            ]
         }
-        if cancelledEarly { continuation.resume(throwing: CancellationError()); return }
-
-        let op = Task {
-            do { self.finish(.success(try await operation())) }
-            catch { self.finish(.failure(error)) }
-        }
-        let timer = Task {
-            try? await Task.sleep(for: .seconds(seconds))
-            self.finish(.failure(PeriscopeError.timeout(seconds: seconds)))
-        }
-        let lost = state.withLock { s in
-            if !s.done { s.tasks = [op, timer] }
-            return s.done
-        }
-        if lost { op.cancel(); timer.cancel() }
     }
 
     func finish(_ result: Result<T, Error>) {

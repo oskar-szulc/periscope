@@ -57,9 +57,9 @@ actor LiveSession {
         let result: CommandResult
         do {
             result = try await block(engine)
-        } catch PeriscopeError.navigationFailed(let url, let reason) where !url.isEmpty {
-            failedNavigation = url
-            throw PeriscopeError.navigationFailed(url: url, reason: reason)
+        } catch let error as PeriscopeError {
+            if case .navigationFailed(let url, _) = error, !url.isEmpty { failedNavigation = url }
+            throw error
         }
         if case .navigate = result {
             failedNavigation = nil

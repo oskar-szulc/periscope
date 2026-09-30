@@ -54,10 +54,7 @@ struct DaemonStatus: ParsableCommand {
 
     func run() throws {
         guard let status = DaemonClient.control(.status) else {
-            if Sandbox.isActive {
-                FileHandle.standardError.write(Data("Error: \(Sandbox.error)\n".utf8))
-                throw ExitCode(Sandbox.error.exitCode)
-            }
+            if Sandbox.isActive { throw Sandbox.error }
             print(json ? #"{"running":false}"# : "daemon: not running")
             return
         }

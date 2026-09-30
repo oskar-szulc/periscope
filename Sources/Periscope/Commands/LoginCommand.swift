@@ -34,7 +34,7 @@ struct Login: ParsableCommand {
         let formatter = makeFormatter(json: isJson)
 
         MainActor.assumeIsolated {
-            AppRunner.run {
+            AppRunner.run(json: isJson) {
                 do {
                     try await Self.executeLogin(
                         parsedURL: parsedURL,
@@ -98,12 +98,8 @@ struct Login: ParsableCommand {
 
         // Wait for login completion with timeout
         do {
-            if timeoutSeconds == 0 {
+            try await withTimeout(seconds: timeoutSeconds) {
                 try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
-            } else {
-                try await withTimeout(seconds: timeoutSeconds) {
-                    try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
-                }
             }
         } catch PeriscopeError.timeout {
             let waited = untilCondition.map { "--until \($0) never held" } ?? "the URL path never changed"

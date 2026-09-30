@@ -41,13 +41,6 @@ enum CommandRunner {
             return
         }
 
-        // In-process needs the window server, which a sandbox denies: it would
-        // hang, not fail.
-        if Sandbox.isActive {
-            emit(ErrorPayload(Sandbox.error), formatter: makeFormatter(json: globals.json), globals: globals)
-            Foundation.exit(Sandbox.error.exitCode)
-        }
-
         runInProcess(globals: globals, command: command)
     }
 
@@ -75,7 +68,7 @@ enum CommandRunner {
         let (width, height) = globals.viewportSize
 
         MainActor.assumeIsolated {
-            AppRunner.run {
+            AppRunner.run(json: globals.json) {
                 let engine = await MainActor.run {
                     let e = BrowserEngine(viewportWidth: width, viewportHeight: height)
                     e.verbose = globals.verbose
