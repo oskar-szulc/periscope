@@ -279,6 +279,19 @@ enum ElementResolver {
         }
     }
 
+    /// Focus the target and select what it holds, so typed keys replace it.
+    static func focusForTypingScript(selector: String) -> String {
+        wrap(target: selector, """
+            var el = P.query(T)[0];
+            el.focus();
+            if (el.select) { el.select(); }
+            else if (el.isContentEditable) {
+                var r = document.createRange(); r.selectNodeContents(el);
+                var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+            }
+        """)
+    }
+
     static func hoverScript(selector: String) -> String {
         wrap(target: selector, """
             var el = P.query(T)[0];

@@ -302,6 +302,49 @@ final class BrowserEngine {
         throw PeriscopeError.notActionable(selector: selector, reason: last.reason ?? "not visible")
     }
 
+    // MARK: - Native input
+
+    private var mouseIsDown = false
+
+    /// Viewport coordinates, top-left origin, the same space as `screenshot`.
+    func mouse(_ action: MouseAction, x: Double, y: Double) throws {
+        switch action {
+        case .down: windowController.mouse(.leftMouseDown, x: x, y: y); mouseIsDown = true
+        case .up: windowController.mouse(.leftMouseUp, x: x, y: y); mouseIsDown = false
+        case .move:
+            // ponytail: drags only. A plain move never reaches the page (WebKit
+            // takes hover from the real cursor's tracking area), and a drag
+            // reports e.buttons == 0 (read from the physical mouse); libraries
+            // that follow down/move/up still see the drag.
+            guard mouseIsDown else {
+                throw PeriscopeError.argumentError(reason: "mouse move drags after `mouse down`; for hover use `periscope hover <target>`")
+            }
+            windowController.mouse(.leftMouseDragged, x: x, y: y)
+        case .click:
+            windowController.mouse(.leftMouseDown, x: x, y: y)
+            windowController.mouse(.leftMouseUp, x: x, y: y)
+            mouseIsDown = false
+        case .scroll: break  // needs deltas; see wheel
+        }
+    }
+
+    func wheel(x: Double, y: Double, dx: Double, dy: Double) {
+        windowController.scrollWheel(x: x, y: y, dx: dx, dy: dy)
+    }
+
+    /// Type as a person does: real key events, at `delayMs` on average with
+    /// jitter, pausing longer after spaces and punctuation.
+    func type(selector: String, text: String, strict: Bool, delayMs: Int) async throws {
+        try await resolveElement(selector: selector, strict: strict)
+        try await runJavaScriptVoid(ElementResolver.focusForTypingScript(selector: selector))
+        for character in text {
+            windowController.key(character)
+            guard delayMs > 0 else { continue }
+            let pause: Double = character == " " ? 1.6 : ",.;:!?".contains(character) ? 2.2 : 1
+            try await Task.sleep(for: .milliseconds(Int(Double(delayMs) * pause * .random(in: 0.5...1.5))))
+        }
+    }
+
     func pressEnter(selector: String) async throws {
         try await runJavaScriptVoid(ElementResolver.pressEnterScript(selector: selector))
     }

@@ -10,7 +10,7 @@ struct PeriscopeRoot: ParsableCommand {
             Reload.self, CurrentURL.self, History.self,
             Extract.self, ExtractData.self, HTML.self, Attr.self, Links.self, Table.self,
             Click.self, Fill.self, SelectOption.self, Check.self,
-            Uncheck.self, Submit.self, Scroll.self, Hover.self,
+            Uncheck.self, Submit.self, Scroll.self, Hover.self, Mouse.self, TypeText.self,
             Screenshot.self,
             Eval.self,
             Session.self,

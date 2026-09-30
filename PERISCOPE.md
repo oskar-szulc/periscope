@@ -141,6 +141,21 @@ periscope elements "<selector>"          # Matching elements with tag, id, class
 Reach for these when you want one specific thing; use `state` when you want to
 orient. `text` is the most token-efficient view of a page's prose.
 
+### Native input
+
+```bash
+periscope type "label:Email" "me@example.com"      # real key events, jittered; --delay-ms, --submit
+periscope mouse click 640 360                     # at viewport coordinates, as in screenshots
+periscope mouse down 100 300; periscope mouse move 400 300; periscope mouse up 400 300   # a drag
+periscope mouse scroll 640 360 --dy 800           # wheel scroll at a point
+```
+
+`fill` sets a field's value from JS; `type` sends real AppKit key events with US-layout
+key codes, which the page sees as trusted (`event.isTrusted`), for forms that watch
+keystrokes. `mouse` events are trusted too. Limits: a plain `mouse move` (hover) does not
+reach the page, so use `hover`; during a drag, `event.buttons` reads 0, so libraries that
+follow mousedown/move/up see it but ones that check `buttons` do not.
+
 ### Structured extraction
 
 ```bash
