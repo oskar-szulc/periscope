@@ -15,12 +15,16 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/Periscope"
+            path: "Sources/Periscope",
+            // Ours only: -Xswiftc -warnings-as-errors would also fail on
+            // swift-argument-parser's own deprecation warnings.
+            swiftSettings: [.treatAllWarnings(as: .error)]
         ),
         .testTarget(
             name: "PeriscopeTests",
             dependencies: ["Periscope"],
-            path: "Tests/PeriscopeTests"
+            path: "Tests/PeriscopeTests",
+            swiftSettings: [.treatAllWarnings(as: .error)]
         ),
     ]
 )

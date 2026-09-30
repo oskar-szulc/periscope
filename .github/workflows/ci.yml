@@ -1,0 +1,22 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # macOS 26 is required: periscope uses WebKit's WebPage API. The tests open
+    # real WebPages and windows, which the runner's GUI session provides.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - run: swift --version
+      - name: Lint
+        run: ./scripts/lint.sh
+      - name: Embedded skill matches skill/
+        run: ./scripts/embed-skill.sh && git diff --exit-code
+      - name: Build (warnings are errors)
+        run: swift build --build-tests
+      - name: Test
+        run: swift test

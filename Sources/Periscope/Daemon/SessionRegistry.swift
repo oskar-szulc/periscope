@@ -67,7 +67,7 @@ actor SessionRegistry {
     /// Drop an ephemeral session once its command is done. Named sessions ignore
     /// this -- they live until evicted.
     func release(_ session: LiveSession) async {
-        let name = await session.name
+        let name = session.name
         guard let entry = entries[name], entry.isEphemeral else { return }
         entries[name] = nil
         await entry.session.shutdown()
@@ -78,7 +78,7 @@ actor SessionRegistry {
     /// queue behind it. Drop it without saving, since saving runs JS on the
     /// wedged page; the next command cold-starts from the last snapshot.
     func discard(_ session: LiveSession) async {
-        let name = await session.name
+        let name = session.name
         guard let entry = entries[name], entry.session === session else { return }
         entries[name] = nil
         await entry.session.abandon()
