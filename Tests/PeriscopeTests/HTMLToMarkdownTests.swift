@@ -6,6 +6,11 @@ import Testing
 struct HTMLToMarkdownTests {
     let converter = HTMLToMarkdown()
 
+    @Test func emptyIconTagsLeaveNothing() {
+        #expect(converter.convert("<p><i class=\"icon-star\"></i><i class=\"icon-star\"></i>Rated</p>") == "Rated")
+        #expect(converter.convert("<b>Bold</b> and <i>it</i>") == "**Bold** and *it*")
+    }
+
     @Test func imagesOffKeepAltTextAndLinksOffKeepLinkText() {
         let lean = HTMLToMarkdown(links: false, images: false)
         #expect(lean.convert("<img src=\"pic.jpg\" alt=\"Photo\">") == "Photo")

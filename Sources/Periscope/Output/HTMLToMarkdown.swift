@@ -43,6 +43,14 @@ struct HTMLToMarkdown: Sendable {
             )
         }
 
+        // Empty inline tags first: an icon font's <i class="icon-star"></i>
+        // used to become a line of "**" per star.
+        text = text.replacingOccurrences(
+            of: #"<(i|em|b|strong)\b[^>]*>\s*</\1>"#,
+            with: "",
+            options: .regularExpression
+        )
+
         // 6. Convert bold (strong, b)
         text = text.replacingOccurrences(
             of: #"<strong[^>]*>(.*?)</strong>"#,
