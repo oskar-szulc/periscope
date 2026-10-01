@@ -9,7 +9,7 @@ struct PeriscopeRoot: ParsableCommand {
             the agent skill to a project. Start with `periscope navigate <url> --session <name>`, \
             then `state`, `text` or `extract`.
             """,
-        version: "0.2.3",
+        version: "0.2.4",
         subcommands: [
             Navigate.self, Back.self, Forward.self,
             Reload.self, CurrentURL.self, History.self,
