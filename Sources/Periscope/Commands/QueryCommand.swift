@@ -45,7 +45,6 @@ struct Query: ParsableCommand {
     }
 
     static func execute(globals: GlobalOptions, prompt: String, findElement: Bool) {
-
         CommandRunner.run(globals: globals) { engine in
             // Extract page summary
             guard

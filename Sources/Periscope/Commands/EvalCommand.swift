@@ -31,7 +31,7 @@ struct Eval: ParsableCommand {
             // value is returned. This is safe here since the eval command's entire
             // purpose is to execute arbitrary user-provided JavaScript.
             let multi = script.contains(";") || script.contains("\n")
-            let result = try await engine.runJavaScript(multi ? "eval(\(ElementResolver.jsString(script)))" : script)
+            let result = try await engine.runJavaScript(multi ? "eval(\(ElementResolver.jsLiteral(script)))" : script)
             return .jsResult(
                 value: result.map { r in
                     (r as? String) ?? (r as? NSNumber)?.stringValue

@@ -384,12 +384,11 @@ final class BrowserEngine {
         windowController.hideWindow()
     }
 
-    /// Wait for the URL path to change away from the page the login opened on,
-    /// or for an explicit condition. The baseline is where the page landed, not
-    /// `initialURL`: a redirect before the window opens (`/wp-admin/` to the
-    /// login form) is not the person logging in.
-    func waitForLoginCompletion(initialURL: URL, until: UntilCondition?) async throws {
-        let initialPath = (page.url ?? initialURL).path
+    /// Wait for the URL path to change away from the page the login opened on
+    /// (after any redirect: `/wp-admin/` landing on the login form is not the
+    /// person logging in), or for an explicit condition.
+    func waitForLoginCompletion(until: UntilCondition?) async throws {
+        let initialPath = page.url?.path
 
         while true {
             if let until {
@@ -399,11 +398,9 @@ final class BrowserEngine {
                     ? (try? await runJavaScript(ElementResolver.existsScript(selector: until.value))) as? Bool ?? false
                     : false
                 if until.holds(url: page.url?.absoluteString ?? "", title: page.title, matches: matches) { break }
-            } else {
-                if let path = page.url?.path, path != initialPath, !page.isLoading {
-                    try await Task.sleep(for: .seconds(1))
-                    break
-                }
+            } else if let path = page.url?.path, path != initialPath, !page.isLoading {
+                try await Task.sleep(for: .seconds(1))
+                break
             }
             try await Task.sleep(for: .milliseconds(500))
         }
@@ -493,7 +490,7 @@ final class BrowserEngine {
     /// caller aimed at what they want.
     func readableContent(from selector: String?) async throws -> String {
         let rootExpr =
-            selector.map { "document.querySelector(\(ElementResolver.jsString($0)))" }
+            selector.map { "document.querySelector(\(ElementResolver.jsLiteral($0)))" }
             ?? PageSummarizer.mainContentExpr
         let extraStrip = selector == nil ? ", nav, header, footer, aside" : ""
         let js = """
@@ -550,7 +547,7 @@ final class BrowserEngine {
         if let selector {
             js = """
                 (function() {
-                    var el = document.querySelector(\(ElementResolver.jsString(selector)));
+                    var el = document.querySelector(\(ElementResolver.jsLiteral(selector)));
                     return el ? el.outerHTML : null;
                 })();
                 """
@@ -566,8 +563,8 @@ final class BrowserEngine {
     func extractAttribute(selector: String, attribute: String) async throws -> String {
         let js = """
             (function() {
-                var el = document.querySelector(\(ElementResolver.jsString(selector)));
-                return el ? el.getAttribute(\(ElementResolver.jsString(attribute))) : null;
+                var el = document.querySelector(\(ElementResolver.jsLiteral(selector)));
+                return el ? el.getAttribute(\(ElementResolver.jsLiteral(attribute))) : null;
             })();
             """
         guard let value = try await runJavaScript(js) as? String else {
@@ -591,7 +588,7 @@ final class BrowserEngine {
     func extractTable(selector: String) async throws -> String {
         let js = """
             (function() {
-                var table = document.querySelector(\(ElementResolver.jsString(selector)));
+                var table = document.querySelector(\(ElementResolver.jsLiteral(selector)));
                 if (!table) return null;
                 return Array.from(table.querySelectorAll('tr')).map(function(row) {
                     return Array.from(row.querySelectorAll('td, th'))

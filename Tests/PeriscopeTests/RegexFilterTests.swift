@@ -4,7 +4,7 @@ import Testing
 @testable import Periscope
 
 @Suite("Links --match")
-struct LinkFilterTests {
+struct RegexFilterTests {
     let links = [
         LinkItem(text: "Job A", url: "https://jobs.ashbyhq.com/acme/1111"),
         LinkItem(text: "Board", url: "https://jobs.ashbyhq.com/acme"),

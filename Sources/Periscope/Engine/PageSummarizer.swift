@@ -22,7 +22,7 @@ enum PageSummarizer {
     /// JS expression for the element a `text` read starts from: the target's
     /// first match, or the main content root.
     static func rootExpr(_ selector: String?) -> String {
-        selector.map { "window.__periscope.query(\(ElementResolver.jsString($0)))[0]" } ?? mainContentExpr
+        selector.map { "window.__periscope.query(\(ElementResolver.jsLiteral($0)))[0]" } ?? mainContentExpr
     }
 
     /// JavaScript that extracts a structured page summary from the DOM.

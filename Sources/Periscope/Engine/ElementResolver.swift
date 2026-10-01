@@ -19,9 +19,10 @@ enum ElementResolver {
     /// milliseconds after `load`; failing instantly turned those into "not found".
     static let actionabilityWaitMs = 5000
 
-    /// A JS string literal for `s`: a JSON string is one.
-    static func jsString(_ s: String) -> String {
-        String(decoding: try! JSONEncoder().encode(s), as: UTF8.self)
+    /// A JS literal for `value`: its JSON encoding is one. Everything sent
+    /// into page JS from Swift goes through here.
+    static func jsLiteral(_ value: some Encodable) -> String {
+        String(decoding: try! JSONEncoder().encode(value), as: UTF8.self)
     }
 
     /// JavaScript helpers shared by every script here and by `PageSummarizer`,
@@ -189,7 +190,7 @@ enum ElementResolver {
 
     /// Wrap a script body so `P` is the resolver and `T` the target.
     private static func wrap(target: String, _ body: String) -> String {
-        "(function() { var P = window.__periscope; var T = \(jsString(target)); \(body) })()"
+        "(function() { var P = window.__periscope; var T = \(jsLiteral(target)); \(body) })()"
     }
 
     static func existsScript(selector: String) -> String {
@@ -222,7 +223,7 @@ enum ElementResolver {
             target: selector,
             """
                 var el = P.query(T)[0];
-                var v = \(jsString(value));
+                var v = \(jsLiteral(value));
                 el.focus();
                 if (el.isContentEditable) {
                     el.textContent = v;
@@ -257,7 +258,7 @@ enum ElementResolver {
             target: selector,
             """
                 var el = P.query(T)[0];
-                el.value = \(jsString(value));
+                el.value = \(jsLiteral(value));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             """)
     }
@@ -279,7 +280,7 @@ enum ElementResolver {
     static func submitScript(selector: String?) -> String {
         let find =
             selector.map {
-                "var el = P.query(\(jsString($0)))[0]; var form = el.tagName === 'FORM' ? el : (el.form || el.closest('form'));"
+                "var el = P.query(\(jsLiteral($0)))[0]; var form = el.tagName === 'FORM' ? el : (el.form || el.closest('form'));"
             }
             ?? "var form = document.forms[0];"
         return """

@@ -62,28 +62,23 @@ struct WaitChallengeTests {
 
 @Suite("login completion")
 struct LoginCompletionTests {
-    private func page(_ name: String, _ body: String) throws -> URL {
+    private func page(_ name: String) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(name)-\(UUID().uuidString).html")
-        try "<html><body>\(body)</body></html>".write(to: url, atomically: true, encoding: .utf8)
+        try "<html><body><form></form></body></html>".write(to: url, atomically: true, encoding: .utf8)
         return url
     }
 
-    /// `/wp-admin/` redirects to `/wp-login.php` before the person sees it: the
-    /// page it landed on is the baseline, not the URL that was asked for.
-    @Test @MainActor func aRedirectBeforeTheWindowOpensIsNotALogin() async throws {
+    /// The page the login opened on is the baseline, so only leaving it ends
+    /// the wait; `/wp-admin/` having redirected to the login form does not.
+    @Test @MainActor func onlyLeavingThePageItOpenedOnIsALogin() async throws {
         let engine = BrowserEngine(viewportWidth: 800, viewportHeight: 600)
         defer { engine.close() }
-        let requested = try page("admin", "")
-        let dashboard = try page("dashboard", "")
-        _ = try await engine.navigate(to: try page("login", "<form></form>"))
+        let dashboard = try page("dashboard")
+        _ = try await engine.navigate(to: try page("login"))
         await #expect(throws: PeriscopeError.self) {
-            try await withTimeout(seconds: 3) {
-                try await engine.waitForLoginCompletion(initialURL: requested, until: nil)
-            }
+            try await withTimeout(seconds: 3) { try await engine.waitForLoginCompletion(until: nil) }
         }
         _ = try await engine.runJavaScript("location.href = '\(dashboard.absoluteString)'")
-        try await withTimeout(seconds: 5) {
-            try await engine.waitForLoginCompletion(initialURL: requested, until: nil)
-        }
+        try await withTimeout(seconds: 5) { try await engine.waitForLoginCompletion(until: nil) }
     }
 }

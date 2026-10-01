@@ -25,14 +25,12 @@ struct Login: ParsableCommand {
             throw PeriscopeError.argumentError(reason: "Invalid URL: \(url)")
         }
 
-        // A person needs longer than a page load; 0 waits until Ctrl-C.
-        let timeoutSeconds = globals.timeout == 30 ? 120 : globals.timeout
         let formatter = makeFormatter(json: globals.json)
 
         MainActor.assumeIsolated {
             AppRunner.run(json: globals.json) {
                 do {
-                    try await login(parsedURL, until: untilCondition, timeoutSeconds: timeoutSeconds, formatter: formatter)
+                    try await login(parsedURL, until: untilCondition, formatter: formatter)
                 } catch {
                     let payload = ErrorPayload(error)
                     CommandRunner.emit(payload, formatter: formatter, globals: globals)
@@ -44,8 +42,10 @@ struct Login: ParsableCommand {
 
     @MainActor
     private func login(
-        _ parsedURL: URL, until untilCondition: UntilCondition?, timeoutSeconds: Int, formatter: OutputFormatting
+        _ parsedURL: URL, until untilCondition: UntilCondition?, formatter: OutputFormatting
     ) async throws {
+        // A person needs longer than a page load; 0 waits until Ctrl-C.
+        let timeoutSeconds = globals.timeout == 30 ? 120 : globals.timeout
         let (width, height) = globals.viewportSize
         let engine = BrowserEngine(viewportWidth: width, viewportHeight: height)
         engine.setUserAgent(globals.userAgent)
@@ -62,7 +62,7 @@ struct Login: ParsableCommand {
 
         do {
             try await withTimeout(seconds: timeoutSeconds) {
-                try await engine.waitForLoginCompletion(initialURL: parsedURL, until: untilCondition)
+                try await engine.waitForLoginCompletion(until: untilCondition)
             }
         } catch PeriscopeError.timeout {
             let waited = untilCondition.map { "--until \($0) never held" } ?? "the URL path never changed"

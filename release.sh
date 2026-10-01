@@ -32,7 +32,6 @@ tar -czf "dist/$TARBALL" -C "$(dirname "$BIN")" periscope
 (cd dist && shasum -a 256 "$TARBALL" > "$TARBALL.sha256")
 SHA=$(cut -d' ' -f1 "dist/$TARBALL.sha256")
 
-
 # MCP bundle: the same binary, run as `periscope mcp`. The tool list comes
 # from the server itself, so it cannot drift from the code.
 mkdir -p dist/mcpb/server

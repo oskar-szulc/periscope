@@ -13,7 +13,7 @@ final class HiddenWindowController {
     private var resourceMode = ResourceMode.full
     /// The page's layout size, restored when a shown window is hidden again so
     /// a preview does not change what later commands read.
-    private var viewport: NSSize
+    private let viewport: NSSize
     private var screenObserver: NSObjectProtocol?
 
     /// What real Safari appends to WebKit's user agent. An embedder gets

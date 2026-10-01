@@ -18,8 +18,8 @@ enum PageRecords {
     /// Both accept any target `state` prints (CSS, text:, role:...), resolved by
     /// the page's `window.__periscope`.
     static func script(from: String?, items: String?) -> String {
-        let fromJS = from.map(ElementResolver.jsString) ?? "null"
-        let itemsJS = items.map(ElementResolver.jsString) ?? "null"
+        let fromJS = from.map { ElementResolver.jsLiteral($0) } ?? "null"
+        let itemsJS = items.map { ElementResolver.jsLiteral($0) } ?? "null"
         return """
             (function() {
                 var P = window.__periscope, FROM = \(fromJS), ITEMS = \(itemsJS);
