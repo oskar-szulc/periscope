@@ -21,10 +21,6 @@ on:
       tag:
         type: string
         required: true
-      dry_run:
-        description: Show the formula, do not push
-        type: boolean
-        default: false
 
 permissions:
   contents: read

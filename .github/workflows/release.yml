@@ -34,7 +34,6 @@ jobs:
     uses: ./.github/workflows/update-homebrew-tap.yml
     with:
       tag: ${{ github.ref_name }}
-      dry_run: false
     secrets: inherit
 
   mcp-registry:
@@ -45,4 +44,3 @@ jobs:
     uses: ./.github/workflows/publish-mcp-registry.yml
     with:
       tag: ${{ github.ref_name }}
-      dry_run: false
