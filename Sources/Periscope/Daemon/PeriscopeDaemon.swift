@@ -139,7 +139,13 @@ final class PeriscopeDaemon: @unchecked Sendable {
 
         let response: Response
         do {
-            response = await execute(try JSONDecoder().decode(Request.self, from: payload))
+            // The version first: a request from a newer client need not decode
+            // as this daemon's Request at all, and must still get PROTOCOL_MISMATCH.
+            let version = try JSONDecoder().decode(VersionProbe.self, from: payload).protocolVersion
+            response =
+                version == periscopeProtocolVersion
+                ? await execute(try JSONDecoder().decode(Request.self, from: payload))
+                : mismatch(clientVersion: version)
         } catch {
             response = .failure(
                 ErrorPayload(
@@ -153,19 +159,18 @@ final class PeriscopeDaemon: @unchecked Sendable {
         }
     }
 
-    private func execute(_ request: Request) async -> Response {
-        guard request.protocolVersion == periscopeProtocolVersion else {
-            // Version skew after a rebuild. Refuse, then exit so the client's
-            // respawn brings up a daemon matching the new binary.
-            Task { await self.exitDaemon() }
-            return .failure(
-                ErrorPayload(
-                    code: "PROTOCOL_MISMATCH",
-                    message: "daemon speaks protocol \(periscopeProtocolVersion), "
-                        + "client speaks \(request.protocolVersion)",
-                    exitCode: 4))
-        }
+    /// Version skew after a rebuild. Refuse, then exit so the client's
+    /// respawn brings up a daemon matching the new binary.
+    private func mismatch(clientVersion: Int) -> Response {
+        Task { await self.exitDaemon() }
+        return .failure(
+            ErrorPayload(
+                code: "PROTOCOL_MISMATCH",
+                message: "daemon speaks protocol \(periscopeProtocolVersion), client speaks \(clientVersion)",
+                exitCode: 4))
+    }
 
+    private func execute(_ request: Request) async -> Response {
         if let verb = request.control {
             return await handleControl(verb, arguments: request.arguments)
         }
@@ -206,8 +211,8 @@ final class PeriscopeDaemon: @unchecked Sendable {
                 try await session.run(verbose: options.verbose, block)
             }
             response = .ok(result, warnings: warnings + (await session.drainWarnings()))
-        } catch let error as PeriscopeError {
-            if case .timeout = error {
+        } catch {
+            if case PeriscopeError.timeout = error {
                 warnings.append("Page at timeout: \(await session.locationDescription())")
                 if !options.noSession {
                     await registry.discard(session)
@@ -215,13 +220,10 @@ final class PeriscopeDaemon: @unchecked Sendable {
                         "Session '\(options.session)' was reset so the next command does not wait on this one; it restarts from its last saved state, so navigate again before reading."
                     )
                 }
+            } else if !(error is PeriscopeError) {
+                warnings.append("unexpected error: \(error)")
             }
             response = .failure(ErrorPayload(error), warnings: warnings)
-        } catch {
-            warnings.append("unexpected error: \(error)")
-            response = .failure(
-                ErrorPayload(error),
-                warnings: warnings)
         }
 
         if options.noSession { await registry.release(session) }

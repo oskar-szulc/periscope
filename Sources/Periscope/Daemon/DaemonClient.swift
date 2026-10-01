@@ -20,10 +20,17 @@ enum DaemonClient {
     /// - Returns: the daemon's response, or nil to mean "fall back in-process".
     static func send(globals: GlobalOptions) -> Response? {
         guard let response = roundTrip(request(for: globals)) else { return nil }
-        guard response.error?.code == "PROTOCOL_MISMATCH" else { return response }
-
-        // The resident daemon is from an older binary and is shutting itself
-        // down. Wait for it to go, then retry once against a fresh one.
+        // The resident daemon is from an older binary. One that checks the
+        // version first is already shutting itself down; one from 0.2.4 or
+        // earlier decoded the whole request first, failed, and must be told to
+        // stop (a control request still decodes there). Wait for it to go,
+        // then retry once against a fresh one.
+        switch response.error {
+        case let e? where e.code == "PROTOCOL_MISMATCH": break
+        case let e? where e.code == "BAD_REQUEST" && e.message.hasPrefix("could not decode request"):
+            _ = control(.stop)
+        default: return response
+        }
         _ = SocketIO.poll(seconds: spawnBudget) { !socketExists }
         guard let retry = roundTrip(request(for: globals)),
             retry.error?.code != "PROTOCOL_MISMATCH"

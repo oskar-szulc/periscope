@@ -3,7 +3,7 @@ import Foundation
 /// Bumped whenever `Request`, `Response`, or `CommandResult` change shape.
 /// A client and daemon that disagree cannot safely talk, so the daemon shuts
 /// down on mismatch and the client respawns it — see `DaemonClient`.
-let periscopeProtocolVersion = 8
+let periscopeProtocolVersion = 9
 
 enum DaemonPaths {
     /// Everything periscope keeps: `~/.periscope`, or `PERISCOPE_DIR` to keep a
@@ -52,10 +52,6 @@ enum DaemonPaths {
 struct GlobalOptionsPayload: Codable, Sendable {
     var session: String
     var noSession: Bool
-    /// Unread by the daemon, but a daemon decodes the whole request before it
-    /// checks `protocolVersion`: dropping a field makes an older one answer
-    /// BAD_REQUEST instead of PROTOCOL_MISMATCH, and the client never respawns it.
-    var json: Bool
     var timeout: Int
     var viewport: String
     var verbose: Bool
@@ -66,7 +62,6 @@ struct GlobalOptionsPayload: Codable, Sendable {
     init(_ g: GlobalOptions) {
         session = g.session
         noSession = g.noSession
-        json = g.json
         timeout = g.timeout
         viewport = g.viewport
         verbose = g.verbose
@@ -94,6 +89,11 @@ struct DaemonStatusPayload: Codable, Sendable {
     var uptimeSeconds: Int
     var protocolVersion: Int
     var sessions: [SessionInfoPayload]
+}
+
+/// The one field every protocol version shares, decoded before the rest.
+struct VersionProbe: Decodable {
+    var protocolVersion: Int
 }
 
 struct Request: Codable, Sendable {

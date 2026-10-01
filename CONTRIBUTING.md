@@ -17,10 +17,7 @@ swift test             # includes tests that load real pages in WebKit
   back). Put it there with `rm` then `cp`, never `cp` over the old binary: macOS caches
   code signatures per inode and kills an overwritten binary.
 - **Wire changes:** bump `periscopeProtocolVersion` whenever `Request`, `Response` or
-  `CommandResult` change shape; a mismatched daemon restarts itself. Never remove or
-  rename a `Request` field, even an unread one: a daemon decodes the whole request
-  before it checks the version, so an older one answers `BAD_REQUEST` and is never
-  replaced. Adding an optional field is safe.
+  `CommandResult` change shape; a mismatched daemon restarts itself.
 - **Commits:** one change per commit, with the reason in the message.
 - **Releases:** bump the version in `Sources/Periscope/Commands/PeriscopeCommand.swift`
   and `.claude-plugin/plugin.json`, commit, then push a tag: `git tag v<version> &&
