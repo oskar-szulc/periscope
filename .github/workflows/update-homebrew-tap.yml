@@ -1,6 +1,6 @@
 name: Update Homebrew tap
 
-# A published release (release.sh --publish) updates Formula/periscope.rb in
+# A published release (release.yml, or release.sh --publish) updates Formula/periscope.rb in
 # oskar-szulc/homebrew-tap, through a deploy key that can write to that one
 # repository (secret HOMEBREW_TAP_DEPLOY_KEY). Run it manually with dry_run to
 # see the formula without pushing.
@@ -16,6 +16,15 @@ on:
         description: Show the formula, do not push
         type: boolean
         default: true
+  workflow_call: # from release.yml
+    inputs:
+      tag:
+        type: string
+        required: true
+      dry_run:
+        description: Show the formula, do not push
+        type: boolean
+        default: false
 
 permissions:
   contents: read

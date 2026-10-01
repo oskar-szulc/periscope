@@ -1,0 +1,48 @@
+name: Release
+
+# Pushing a tag v<version> builds and publishes that release with release.sh
+# (bump PeriscopeCommand.swift and .claude-plugin/plugin.json first; the script
+# refuses a mismatch), then updates the Homebrew tap and the MCP Registry.
+# Those two are called here because a release created with GITHUB_TOKEN does
+# not fire their `release: published` trigger; a release made locally with
+# ./release.sh --publish still does.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    # Same runner as CI: release.sh runs the tests, which open real WebPages.
+    runs-on: macos-26
+    permissions:
+      contents: write # gh release create
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5 # npx, for the mcpb bundle
+        with:
+          node-version: 22
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: ./release.sh "${GITHUB_REF_NAME#v}" --publish
+
+  homebrew-tap:
+    needs: publish
+    permissions:
+      contents: read
+    uses: ./.github/workflows/update-homebrew-tap.yml
+    with:
+      tag: ${{ github.ref_name }}
+      dry_run: false
+    secrets: inherit
+
+  mcp-registry:
+    needs: publish
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/publish-mcp-registry.yml
+    with:
+      tag: ${{ github.ref_name }}
+      dry_run: false

@@ -22,5 +22,8 @@ swift test             # includes tests that load real pages in WebKit
   before it checks the version, so an older one answers `BAD_REQUEST` and is never
   replaced. Adding an optional field is safe.
 - **Commits:** one change per commit, with the reason in the message.
-- **Releases:** `./release.sh <version>` builds `dist/`; `--publish` creates the GitHub
-  release. See the script's header.
+- **Releases:** bump the version in `Sources/Periscope/Commands/PeriscopeCommand.swift`
+  and `.claude-plugin/plugin.json`, commit, then push a tag: `git tag v<version> &&
+  git push origin v<version>`. The Release workflow runs `release.sh --publish` on a
+  macOS runner and updates the Homebrew tap and the MCP Registry. `./release.sh
+  <version>` builds `dist/` locally; see the script's header.

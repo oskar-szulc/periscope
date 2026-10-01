@@ -5,7 +5,8 @@
 # ad-hoc signed, so no Apple Developer ID is needed) and its .sha256, and an
 # MCP bundle, periscope-<v>.mcpb. With --publish it also creates the GitHub
 # release v<v> with the tarball and bundle, which triggers the workflows that
-# list it in the MCP Registry and update <owner>/homebrew-tap.
+# list it in the MCP Registry and update <owner>/homebrew-tap. Pushing the tag
+# v<v> instead runs all of this in CI (.github/workflows/release.yml).
 set -eu
 cd "$(dirname "$0")"
 VERSION=${1:?usage: ./release.sh <version> [--publish]}

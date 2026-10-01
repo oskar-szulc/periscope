@@ -1,6 +1,6 @@
 name: Publish to MCP Registry
 
-# A published release (release.sh --publish) lists its .mcpb in the MCP
+# A published release (release.yml, or release.sh --publish) lists its .mcpb in the MCP
 # Registry. GitHub's OIDC token proves the io.github.oskar-szulc namespace,
 # so no one has to log in by hand. Run it manually with dry_run to check the
 # login and the entry without publishing.
@@ -16,6 +16,15 @@ on:
         description: Log in and validate only
         type: boolean
         default: true
+  workflow_call: # from release.yml
+    inputs:
+      tag:
+        type: string
+        required: true
+      dry_run:
+        description: Log in and validate only
+        type: boolean
+        default: false
 
 permissions:
   id-token: write # the OIDC token mcp-publisher logs in with
